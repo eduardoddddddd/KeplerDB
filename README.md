@@ -1,271 +1,151 @@
-# KeplerDB — Base de datos del Kepler 4 de Miguel García
+# KeplerDB — Kepler 4 de Miguel García en Python moderno
 
-**Generado:** 2026-03-17  
-**Fuente:** `C:\Program Files (x86)\Kepler 4\`  
-**Base de datos:** `kepler.db` (SQLite 3, 2.4 MB)  
-**Encoding original:** CP850 (DOS español) → UTF-8 en la DB
-
----
-
-## Resumen de contenido
-
-| Tabla | Registros | Descripción |
-|-------|-----------|-------------|
-| `interpretaciones` | **743** | Textos interpretativos de todos los .ASC |
-| `cartas` | **8.502** | Cartas natales de los .DAT originales |
-| `rpn_scripts` | **22** | Scripts .RPN del motor de Kepler |
-| `interpretaciones_fts` | (virtual) | Índice full-text sobre interpretaciones |
+**Versión:** 1.2  
+**Autor:** Eduardo Abdul Malik Arias  
+**Descripción:** Migración completa del programa de astrología Kepler 4 (DOS, años 90) de Miguel García a una aplicación web moderna con Flask, SQLite y pyswisseph.
 
 ---
 
-## Tabla: `interpretaciones`
+## 🚀 Cómo lanzar la aplicación
 
-La tabla principal. Todos los textos interpretativos del Kepler normalizados y con metadatos inferidos.
+### Opción 1 — Doble clic (más fácil)
+```
+Doble clic en: ARRANCAR.bat
+```
+El navegador se abre solo en `http://localhost:5000`
 
-### Columnas
+### Opción 2 — Línea de comandos
+```bat
+cd C:\Users\Edu\Documents\ClaudeWork\KeplerDB
+py -X utf8 app\app.py
+```
+Luego abre `http://localhost:5000` en el navegador.
 
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER | Clave primaria |
-| `fichero` | TEXT | Fichero .ASC origen |
-| `indice` | INTEGER | Índice 1-based dentro del fichero |
-| `cabecera` | TEXT | Título del bloque (ej: "SOL EN ARIES O CASA 1") |
-| `texto` | TEXT | Texto interpretativo completo |
-| `planeta1` | TEXT | Planeta principal (Sol, Luna, Marte...) |
-| `planeta2` | TEXT | Planeta secundario (para aspectos) |
-| `signo` | TEXT | Signo zodiacal (Aries, Tauro...) |
-| `casa` | INTEGER | Casa astrológica (1-12) |
-| `aspecto` | TEXT | Tipo de aspecto (Conjunción, Trígono...) |
-| `codigo_pareja` | TEXT | Código sinastría (ej: EAB, EAM) solo en PAREJA.ASC |
-| `valencia` | TEXT | Beneficioso / Tenso (solo PAREJA.ASC) |
-| `palabras_clave` | TEXT | Primeras palabras del texto |
+### Para cerrar la app
+Cierra la ventana de comando que se abrió, o pulsa `Ctrl+C` en ella.
 
-### Distribución por fichero
-
-| Fichero | Bloques | Contenido |
-|---------|---------|-----------|
-| `PAREJA.ASC` | 173 | Sinastría — sistema de códigos ==EAB/EAM etc. |
-| `CASAS.ASC` | 145 | Planetas en casas (extendido) |
-| `REGENTES.ASC` | 144 | Regentes de casas |
-| `ASPECTOS.ASC` | 136 | Aspectos entre planetas |
-| `PLANETAS.ASC` | 120 | Planetas en signo/casa (principal) |
-| `ASCEN.ASC` | 12 | Ascendente en signo |
-| `SOL.ASC` | 12 | Sol — textos complementarios |
-| `FIGURASD.ASC` | 1 | Doc. congreso figuras geométricas (texto libre) |
+> **No es un HTML estático** — es una app Flask (Python) que necesita estar ejecutándose.
+> El navegador solo muestra la interfaz; todos los cálculos se hacen en Python local.
 
 ---
 
-## Tabla: `cartas`
+## 📋 Requisitos
 
-Base de datos de cartas natales del Kepler original.
-
-### Columnas
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER | Clave primaria |
-| `fichero_origen` | TEXT | Fichero .DAT de origen |
-| `nombre` | TEXT | Nombre del nativo |
-| `lugar` | TEXT | Lugar de nacimiento |
-| `anio/mes/dia` | INTEGER | Fecha de nacimiento |
-| `hora/min` | INTEGER | Hora de nacimiento |
-| `gmt` | REAL | Diferencia horaria GMT (ej: -1.0 = España invierno) |
-| `lat` | REAL | Latitud (positivo = Norte) |
-| `lon` | REAL | Longitud (positivo = Este) |
-| `tags` | TEXT | Etiquetas originales separadas por coma |
-| `descripcion` | TEXT | Profesión/descripción libre |
-
-### Ficheros de cartas disponibles
-
-| Fichero | Cartas | Temática |
-|---------|--------|----------|
-| `ESTUDI.DAT` | 1.309 | Estudio general |
-| `CESQUIZO.DAT` | 1.308 | Esquizofrenia (investigación) |
-| `MEDFRA.DAT` | 1.082 | Médicos franceses |
-| `CURFRA.DAT` | 883 | Curadores/sanadores franceses |
-| `MEDESP.DAT` | 764 | Médicos españoles |
-| `CARTAS1.DAT` | 465 | Cartas generales |
-| `MU.DAT` | 488 | Muertos/fallecidos |
-| `CMURDE.DAT` / `MURDE.DAT` | 589 | Homicidas/crímenes |
-| `CART.DAT` | 340 | Cartas generales |
-| `ESTUDIO3.DAT` | 260 | Estudio 3 |
-| `FAMOSOS.DAT` | 362 | Personajes famosos |
-| `MUNDIAL.DAT` | 21 | Eventos mundiales |
-| `CONCILIO.DAT` | 19 | Concilios religiosos |
-| `POLITIC.DAT` | 9 | Políticos |
-| `HORARIAS.DAT` | 5 | Cartas horarias |
-| `ELCCION.DAT` | 4 | Elecciones |
-| `RIPS.DAT` | 4 | Fallecidos destacados |
-| `MGF.DAT` | 1 | Carta del autor (Miguel García) |
-
----
-
-## Tabla: `rpn_scripts`
-
-Scripts .RPN del motor de interpretación de Kepler (texto legible).
-
-### Ficheros RPN guardados
-
-El motor RPN usa un lenguaje stack-based (postfix). Elementos clave:
-- `sol signo !!` → calcula signo del Sol y lo empuja al stack
-- `\SELECT fichero.asc -N` → muestra bloque N del .ASC
-- `@S1` → sustituye por valor en posición 1 del stack (ej: "ARIES")
-- `$comentario` → comentario
-
-| Fichero | Descripción |
-|---------|-------------|
-| `PLANETAS.RPN` | Motor planetas en signo/casa |
-| `CASAS.RPN` | Motor de casas |
-| `ASPECTOS.RPN` | Motor de aspectos |
-| `R_SOLAR.RPN` | Revolución Solar |
-| `T_INDIVI.RPN` | Tránsitos individuales |
-| `T_PAREJA.RPN` | Tránsitos de pareja |
-| `S_PAREJA.RPN` | Sinastría |
-| `RADICAL.RPN` | Carta radical |
-| `ESTRUC1/2/3.RPN` | Estructuras Celestes (figuras geométricas) |
-| `ARMOGRAM.RPN` | Armogramas |
-| `ARMOPLNT/LUNA/SOL.RPN` | Armónicos varios |
-| `SENDEROS.RPN` | Senderos de vida |
-| `SEFIRAS.RPN` | Séfiras cabalísticas |
-| `JONES.RPN` | Figuras de Jones |
-| `BLOQUEOS.RPN` | Bloqueos psicológicos |
-
----
-
-## Consultas SQL de ejemplo
-
-### Buscar texto para una posición natal concreta
-```sql
--- Sol en Libra
-SELECT cabecera, texto
-FROM interpretaciones
-WHERE planeta1 = 'Sol' AND signo = 'Libra';
-
--- Luna en Casa 12
-SELECT cabecera, texto
-FROM interpretaciones
-WHERE planeta1 = 'Luna' AND casa = 12;
-
--- Saturno en Leo (cualquier casa o signo)
-SELECT cabecera, texto
-FROM interpretaciones
-WHERE planeta1 = 'Saturno' AND signo = 'Leo';
+```
+Python 3.12+
+pip install flask pyswisseph matplotlib numpy
 ```
 
-### Buscar aspectos
-```sql
--- Todos los aspectos de Marte
-SELECT cabecera, texto
-FROM interpretaciones
-WHERE (planeta1 = 'Marte' OR planeta2 = 'Marte')
-  AND aspecto IS NOT NULL;
-
--- Conjunciones Sol-Luna
-SELECT cabecera, texto
-FROM interpretaciones
-WHERE planeta1 = 'Sol' AND planeta2 = 'Luna' AND aspecto = 'Conjunción';
+Todos instalados en el sistema. Si falta alguno:
+```bat
+pip install flask pyswisseph matplotlib numpy
 ```
 
-### Sinastría (PAREJA.ASC)
-```sql
--- Todos los textos de sinastría beneficiosos
-SELECT codigo_pareja, cabecera, texto
-FROM interpretaciones
-WHERE fichero = 'PAREJA.ASC' AND valencia = 'Beneficioso'
-ORDER BY codigo_pareja;
+---
 
--- Textos tensos de pareja
-SELECT codigo_pareja, texto
-FROM interpretaciones
-WHERE fichero = 'PAREJA.ASC' AND valencia = 'Tenso';
+## 🗂️ Estructura del proyecto
+
+```
+KeplerDB/
+├── ARRANCAR.bat              ← Doble clic para lanzar
+├── app/
+│   ├── app.py                ← Servidor Flask (cálculos, rutas API)
+│   └── templates/
+│       └── index.html        ← Interfaz web
+├── kepler.db                 ← Base de datos SQLite con todos los textos
+├── kepler_interp.py          ← Motor de interpretaciones (consulta kepler.db)
+├── build_kepler_db.py        ← Regenera kepler.db desde los .ASC originales
+├── README.md                 ← Este fichero
+└── test_db.py                ← Tests de consulta SQL
 ```
 
-### Búsqueda de texto libre (FTS5)
+Las cartas guardadas se almacenan en `~/astro_cartas/` (JSON).
+
+---
+
+## 🔧 Funcionalidades
+
+### Carta natal
+- Cálculo con pyswisseph (efemérides suizas precisas)
+- Sistema de casas: Placidus (default), Koch, Whole Sign, Equal, Campanus, Regiomontanus
+- 4 tabs: **Posiciones · Aspectos · Rueda zodiacal · Interpretaciones Kepler**
+
+### Interpretaciones Kepler (tab 📖)
+- Textos originales del Kepler 4 de Miguel García
+- **Por signo**: texto para cada planeta en su signo zodiacal
+- **Por casa**: texto para cada planeta en su casa (cuando signo ≠ casa)
+- **Aspectos**: Conjunción / Armónico (trígono+sextil) / Tensión (cuad+opoc)
+- 597 bloques interpretativos en español
+
+### Guardar/cargar cartas
+- Botón **💾 Guardar Carta** tras calcular
+- Panel lateral con lista de cartas guardadas
+- Click en nombre → carga y recalcula automáticamente
+- **✕** para borrar
+
+---
+
+## 🗃️ Base de datos
+
 ```sql
--- Buscar por palabras en los textos
+-- Texto para un planeta en su signo
+SELECT cabecera, texto FROM interpretaciones
+WHERE planeta1='Sol' AND signo='Libra' AND fichero='PLANETAS.ASC';
+
+-- Texto para un planeta en su casa
+SELECT cabecera, texto FROM interpretaciones
+WHERE planeta1='Luna' AND casa=12 AND fichero='PLANETAS.ASC';
+
+-- Aspecto entre dos planetas
+SELECT aspecto, cabecera, texto FROM interpretaciones
+WHERE planeta1='Sol' AND planeta2='Saturno' AND fichero='ASPECTOS.ASC';
+-- aspecto puede ser: Conjunción / Armónico / Tensión
+
+-- Buscar texto libre
 SELECT i.cabecera, i.texto
-FROM interpretaciones_fts fts
-JOIN interpretaciones i ON fts.rowid = i.id
-WHERE interpretaciones_fts MATCH 'intuición artística'
-ORDER BY rank;
+FROM interpretaciones_fts fts JOIN interpretaciones i ON fts.rowid=i.id
+WHERE interpretaciones_fts MATCH 'voluntad energía' ORDER BY rank LIMIT 5;
 
--- Buscar en un fichero específico
-SELECT i.cabecera, i.texto
-FROM interpretaciones_fts fts
-JOIN interpretaciones i ON fts.rowid = i.id
-WHERE interpretaciones_fts MATCH 'voluntad energía'
-  AND i.fichero = 'PLANETAS.ASC'
-ORDER BY rank;
-```
-
-### Cartas natales
-```sql
--- Buscar famoso por nombre
-SELECT nombre, lugar, anio, mes, dia, hora, min, lat, lon, descripcion
-FROM cartas WHERE nombre LIKE '%Einstein%';
-
--- Nacidos en una fecha concreta
-SELECT nombre, lugar, descripcion
-FROM cartas WHERE anio = 1940 AND mes = 10 AND dia = 9;
-
--- Todos los astrólogos en la DB
-SELECT nombre, lugar, anio, descripcion
-FROM cartas WHERE descripcion LIKE '%stról%';
-```
-
-### Leer un script RPN
-```sql
-SELECT contenido FROM rpn_scripts WHERE fichero = 'PLANETAS.RPN';
+-- Cartas de famosos
+SELECT nombre, lugar, anio, mes, dia, descripcion FROM cartas
+WHERE fichero_origen='FAMOSOS.DAT' ORDER BY nombre;
 ```
 
 ---
 
-## Cómo usar desde Python
+## 🔄 Regenerar la base de datos
 
-```python
-import sqlite3
-
-conn = sqlite3.connect(r'C:\Users\Edu\Documents\ClaudeWork\KeplerDB\kepler.db')
-cur = conn.cursor()
-
-# Obtener texto para Sol en Libra
-cur.execute("SELECT texto FROM interpretaciones WHERE planeta1='Sol' AND signo='Libra' LIMIT 1")
-print(cur.fetchone()[0])
-
-# Búsqueda libre
-cur.execute("""
-    SELECT i.cabecera, i.texto
-    FROM interpretaciones_fts fts
-    JOIN interpretaciones i ON fts.rowid = i.id
-    WHERE interpretaciones_fts MATCH ?
-    ORDER BY rank LIMIT 5
-""", ('voluntad liderazgo',))
-for row in cur.fetchall():
-    print(row[0], '-', row[1][:80])
-
-conn.close()
+Si tienes acceso al directorio original del Kepler 4:
+```bat
+py -X utf8 build_kepler_db.py
 ```
+Requiere `C:\Program Files (x86)\Kepler 4\` con los ficheros `.ASC` originales.
 
 ---
 
-## Notas técnicas
+## 📡 API endpoints (Flask)
 
-- **Encoding:** CP850 (DOS español) convertido a UTF-8 en la DB
-- **Separador bloques .ASC estándar:** línea con solo `#`
-- **Separador PAREJA.ASC:** `==COD` al inicio de línea (COD = código 3 letras)
-- **Separador campos .DAT:** `\LETRA>valor` (texto plano, no binario)
-- **FTS5:** Full-text search sobre cabecera + texto + planeta + signo + aspecto
-- **Índices:** planeta1, planeta2, signo, casa, aspecto, fichero, nombre (cartas)
-- **Efemérides originales:** ficheros .EFE (JUP2002D, MAR2002D, VEN2002D, SAT2002D)
-  — no importados, el cálculo de posiciones debe hacerse con pyswisseph
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/calcular` | Calcula carta natal completa |
+| GET | `/cartas/listar` | Lista cartas guardadas |
+| POST | `/cartas/guardar` | Guarda carta actual |
+| GET | `/cartas/cargar/<nombre>` | Carga carta por nombre |
+| DELETE | `/cartas/borrar/<nombre>` | Borra carta |
 
 ---
 
-## Ficheros generados
+## 📖 Sobre el Kepler 4 original
 
-| Fichero | Descripción |
-|---------|-------------|
-| `kepler.db` | Base de datos SQLite principal |
-| `build_kepler_db.py` | Script de construcción (re-ejecutable) |
-| `test_db.py` | Tests y consultas de ejemplo |
-| `README.md` | Esta documentación |
+El **Kepler 4** fue desarrollado por **Miguel García Ferrández** (matemático, Orihuela 1952),
+junto a **Tito Maciá** para investigación astrológica. Programa DOS de los años 90, muy valorado
+en el mundo hispanohablante por sus gráficos claros y sistema interpretativo.
+
+Los textos interpretativos están en ficheros `.ASC` (CP850) con separadores `#`.
+El motor de selección usa un lenguaje propio **RPN** (Reverse Polish Notation) que indexa
+los bloques de texto por número de signo (1=Aries...12=Piscis) y casa.
+
+Los aspectos se agrupan en tres categorías:
+- **Conjunción** — aspectos de 0°
+- **Armónico** — trígono (120°) y sextil (60°)
+- **Tensión** — cuadratura (90°) y oposición (180°)

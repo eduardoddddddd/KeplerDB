@@ -244,6 +244,62 @@ def calcular():
         import traceback
         return jsonify({'ok': False, 'error': traceback.format_exc()})
 
+CARTAS_DIR = os.path.join(os.path.expanduser('~'), 'astro_cartas')
+os.makedirs(CARTAS_DIR, exist_ok=True)
+
+@app.route('/cartas/guardar', methods=['POST'])
+def guardar_carta():
+    try:
+        data = request.json
+        nombre = re.sub(r'[^\w\s-]', '', data.get('nombre', 'sin_nombre'))
+        nombre_file = nombre.lower().replace(' ', '_')
+        path = os.path.join(CARTAS_DIR, f'{nombre_file}.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return jsonify({'ok': True, 'path': path, 'nombre': nombre_file})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/cartas/listar')
+def listar_cartas():
+    try:
+        cartas = []
+        for f in sorted(os.listdir(CARTAS_DIR)):
+            if f.endswith('.json'):
+                path = os.path.join(CARTAS_DIR, f)
+                with open(path, encoding='utf-8') as fh:
+                    d = json.load(fh)
+                cartas.append({
+                    'nombre': d.get('nombre', f[:-5]),
+                    'fecha':  d.get('fecha', ''),
+                    'file':   f[:-5],
+                })
+        return jsonify({'ok': True, 'cartas': cartas})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/cartas/cargar/<nombre>')
+def cargar_carta(nombre):
+    try:
+        path = os.path.join(CARTAS_DIR, f'{nombre}.json')
+        if not os.path.exists(path):
+            return jsonify({'ok': False, 'error': 'Carta no encontrada'})
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify({'ok': True, 'carta': data})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/cartas/borrar/<nombre>', methods=['DELETE'])
+def borrar_carta(nombre):
+    try:
+        path = os.path.join(CARTAS_DIR, f'{nombre}.json')
+        if os.path.exists(path):
+            os.remove(path)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
 if __name__ == '__main__':
     import webbrowser, threading
     threading.Timer(1.2, lambda: webbrowser.open('http://localhost:5000')).start()

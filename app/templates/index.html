@@ -95,6 +95,12 @@ tr:hover td{background:#fafafa}
   </select>
 
   <button class="btn" id="btn-calc" onclick="calcular()">⭐ Calcular Carta Natal</button>
+  <button class="btn" id="btn-guardar" onclick="guardarCarta()" style="background:#2e7d32;display:none;margin-top:6px">💾 Guardar Carta</button>
+  <div id="save-msg" style="font-size:12px;color:#2e7d32;margin-top:4px"></div>
+
+  <h2>Cartas guardadas</h2>
+  <div id="cartas-lista" style="font-size:12px;color:#9e9e9e">—</div>
+  <button onclick="listarCartas()" style="background:none;border:1px solid #e0e0e0;color:#424242;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:6px">🔄 Actualizar</button>
   <div id="error-box"></div>
 </div>
 
@@ -149,6 +155,61 @@ tr:hover td{background:#fafafa}
 </div>
 
 <script>
+window.addEventListener('load', listarCartas);
+
+async function listarCartas(){
+  const r = await fetch('/cartas/listar');
+  const d = await r.json();
+  const el = document.getElementById('cartas-lista');
+  if(!d.ok || !d.cartas.length){ el.textContent='Sin cartas guardadas'; return; }
+  el.innerHTML = d.cartas.map(c=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;
+        padding:4px 0;border-bottom:1px solid #f0f0f0">
+      <span style="cursor:pointer;color:#1565c0" onclick="cargarCarta('${c.file}')">
+        📋 ${c.nombre} <span style="color:#9e9e9e;font-size:10px">${c.fecha}</span>
+      </span>
+      <span style="cursor:pointer;color:#c62828;font-size:12px" onclick="borrarCarta('${c.file}')">✕</span>
+    </div>`).join('');
+}
+
+async function guardarCarta(){
+  if(!window._cartaActual) return;
+  const r = await fetch('/cartas/guardar',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(window._cartaActual)
+  });
+  const d = await r.json();
+  const msg = document.getElementById('save-msg');
+  msg.textContent = d.ok ? '✓ Guardada: '+d.nombre : 'Error: '+d.error;
+  if(d.ok) listarCartas();
+  setTimeout(()=>msg.textContent='', 3000);
+}
+
+async function cargarCarta(nombre){
+  const r = await fetch('/cartas/cargar/'+nombre);
+  const d = await r.json();
+  if(!d.ok){ alert(d.error); return; }
+  const c = d.carta;
+  document.getElementById('nombre').value  = c.nombre||'';
+  document.getElementById('dia').value     = c.dia||'';
+  document.getElementById('mes').value     = c.mes||'';
+  document.getElementById('anio').value    = c.anio||'';
+  document.getElementById('hora').value    = c.hora||'';
+  document.getElementById('min').value     = c.min||'';
+  document.getElementById('offset').value  = c.offset||'';
+  document.getElementById('lat').value     = c.lat||'';
+  document.getElementById('lon').value     = c.lon||'';
+  if(c.lugar) document.getElementById('lugar').value = c.lugar;
+  if(c.sistema) document.getElementById('sistema').value = c.sistema;
+  calcular();
+}
+
+async function borrarCarta(nombre){
+  if(!confirm('¿Borrar carta '+nombre+'?')) return;
+  await fetch('/cartas/borrar/'+nombre,{method:'DELETE'});
+  listarCartas();
+}
+
 function showTab(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
     const names=['tabla','aspectos','rueda','kepler'];
@@ -223,6 +284,14 @@ async function calcular(){
     // Kepler
     document.getElementById('kepler-out').innerHTML = data.kepler;
 
+    window._cartaActual = {
+      nombre:payload.nombre, fecha:data.fecha,
+      dia:parseInt(payload.dia), mes:parseInt(payload.mes), anio:parseInt(payload.anio),
+      hora:parseInt(payload.hora), min:parseInt(payload.min), offset:parseFloat(payload.offset),
+      lat:parseFloat(payload.lat), lon:parseFloat(payload.lon),
+      lugar:payload.lugar, sistema:payload.sistema
+    };
+    document.getElementById('btn-guardar').style.display='block';
     document.getElementById('resultado').style.display='block';
     showTab('tabla');
   } catch(e){

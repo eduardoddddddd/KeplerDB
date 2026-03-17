@@ -22,8 +22,11 @@ SIGN_MAP = {
     'Capricornio':'Capricornio','Acuario':'Acuario','Piscis':'Piscis',
 }
 ASPECT_MAP = {
-    'Conj':'Conjunción','Sext':'Sextil',
-    'Cuad':'Cuadratura','Trig':'Trígono','Opoc':'Oposición',
+    'Conj':'Conjunción',
+    'Sext':'Armónico',   # Trígono y Sextil → mismo bloque "ARMONICO"
+    'Trig':'Armónico',
+    'Cuad':'Tensión',    # Cuadratura y Oposición → mismo bloque "TENSION"
+    'Opoc':'Tensión',
 }
 SIGN_ESP = ['Aries','Tauro','Géminis','Cáncer','Leo','Virgo',
             'Libra','Escorpio','Sagitario','Capricornio','Acuario','Piscis']
@@ -43,21 +46,35 @@ def _casa(lon, cusps):
 
 
 def get_planeta(planeta_dash, signo_str, casa_num):
-    """Devuelve textos por SIGNO (azul) y por CASA (verde) por separado."""
+    """
+    Devuelve textos para planeta:
+    - Por signo: PLANETAS.ASC donde planeta1=P AND signo=S
+    - Por casa:  PLANETAS.ASC donde planeta1=P AND casa=C
+    (ambos usan PLANETAS.ASC — confirmado en CASAS.RPN)
+    """
     p = PLANET_MAP.get(planeta_dash, planeta_dash)
     s = SIGN_MAP.get(signo_str, signo_str)
     conn = _conn(); cur = conn.cursor()
     results = []
+    # texto por signo
     cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
-        WHERE planeta1=? AND signo=?
-        AND fichero IN ('PLANETAS.ASC','ASCEN.ASC','SOL.ASC') LIMIT 1""", (p, s))
+        WHERE planeta1=? AND signo=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, s))
     r = cur.fetchone()
     if r: results.append(r)
-    cur.execute("""SELECT cabecera,texto,'casa' FROM interpretaciones
-        WHERE planeta1=? AND casa=? AND fichero='CASAS.ASC' LIMIT 1""", (p, casa_num))
-    r = cur.fetchone()
-    if r: results.append(r)
-    conn.close(); return results
+    # texto por casa (solo si es diferente del de signo)
+    if casa_num != (SIGN_ESP.index(s)+1 if s in SIGN_ESP else -1):
+        cur.execute("""SELECT cabecera,texto,'casa' FROM interpretaciones
+            WHERE planeta1=? AND casa=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, casa_num))
+        r = cur.fetchone()
+        if r: results.append(r)
+    # Ascendente usa ASCEN.ASC
+    if p == 'Ascendente':
+        cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
+            WHERE planeta1='Ascendente' AND signo=? AND fichero='ASCEN.ASC' LIMIT 1""", (s,))
+        r = cur.fetchone()
+        if r: results = [r]
+    conn.close()
+    return results
 
 def get_aspecto(p1_dash, p2_dash, asp_dash):
     p1=PLANET_MAP.get(p1_dash,p1_dash); p2=PLANET_MAP.get(p2_dash,p2_dash)
