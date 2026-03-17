@@ -30,8 +30,8 @@ PCOLS = {
     'Marte':'#FF5555','Jupiter':'#CC88FF','Saturno':'#88CCFF',
     'Urano':'#44DDCC','Neptuno':'#8888FF','Pluton':'#FF88AA','NodoN':'#FFAA00'
 }
-SISTEMAS = {'Regiomontanus':b'R','Placidus':b'P','Koch':b'K',
-            'Whole Sign':b'W','Equal':b'E','Campanus':b'C'}
+SISTEMAS = {'Placidus':b'P','Koch':b'K','Whole Sign':b'W',
+            'Equal':b'E','Campanus':b'C','Regiomontanus':b'R'}
 PLANET_IDS = {
     'Sol':swe.SUN,'Luna':swe.MOON,'Mercurio':swe.MERCURY,
     'Venus':swe.VENUS,'Marte':swe.MARS,'Jupiter':swe.JUPITER,
@@ -84,14 +84,14 @@ def rueda_png(carta, nombre='', fecha=''):
     cusps   = carta['cusps']
     ASC     = carta['ASC']
     fig, ax = plt.subplots(1,1, figsize=(8,8),
-                           subplot_kw={'projection':'polar'}, facecolor='#0d1117')
-    ax.set_facecolor('#0d1117')
+                           subplot_kw={'projection':'polar'}, facecolor='#ffffff')
+    ax.set_facecolor('#f8f9fa')
     lp = lambda lon: np.radians(180.0+(lon-ASC)%360) % (2*np.pi)
 
     R_OUT=1.0; R_ZO=0.92; R_ZI=0.78; R_HO=0.76; R_HI=0.56; R_PL=0.72
 
     # Fondo signos
-    ELEM_COLS=['#2a0a0a','#0a2a0a','#0a0a2a','#1a1a2a']
+    ELEM_COLS=['#fff0f0','#f0fff0','#f0f0ff','#f5f0ff']
     for i in range(12):
         t1 = lp(i*30); t2 = lp((i+1)*30)
         if t2 < t1: t1, t2 = t2, t1
@@ -104,7 +104,7 @@ def rueda_png(carta, nombre='', fecha=''):
         mid = np.radians(180.0+((i+0.5)*30-ASC)%360) % (2*np.pi)
         ax.text(mid, (R_ZI+R_ZO)/2, SIGN_GLYPHS[i],
                 ha='center', va='center', fontsize=11,
-                color='#8899cc', fontweight='bold')
+                color='#3949ab', fontweight='bold')
 
     # Casas
     for i, c in enumerate(cusps):
@@ -113,7 +113,7 @@ def rueda_png(carta, nombre='', fecha=''):
         col = '#6688aa' if i in (0,3,6,9) else '#334455'
         ax.plot([th,th],[R_HI,R_ZI], color=col, lw=lw, zorder=5)
         ax.text(th, R_HI-0.04, str(i+1), ha='center', va='center',
-                fontsize=7, color='#556677')
+                fontsize=7, color='#424242')
 
     ax.fill_between(np.linspace(0,2*np.pi,360), R_HI, R_HI, color='none',
                     edgecolor='#334466', linewidth=0.5)
@@ -133,10 +133,10 @@ def rueda_png(carta, nombre='', fecha=''):
                 color=col, lw=0.5, alpha=0.4, zorder=3)
 
     ax.text(0, 0, '☽', ha='center', va='center',
-            fontsize=18, color='#336688', zorder=10)
+            fontsize=18, color='#3949ab', zorder=10)
     titulo = f'{nombre}  {fecha}' if nombre else fecha
     if titulo:
-        ax.set_title(titulo, color='#8899aa', fontsize=9, pad=6)
+        ax.set_title(titulo, color='#424242', fontsize=9, pad=6)
     ax.set_rticks([]); ax.set_xticks([])
     ax.spines['polar'].set_visible(False)
     ax.set_ylim(0, 1.01)
@@ -144,7 +144,7 @@ def rueda_png(carta, nombre='', fecha=''):
 
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=140,
-                facecolor='#0d1117', bbox_inches='tight')
+                facecolor='#ffffff', bbox_inches='tight')
     plt.close(fig)
     buf.seek(0)
     return base64.b64encode(buf.read()).decode('utf-8')
