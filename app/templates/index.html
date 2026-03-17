@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>KeplerDB — Carta Natal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',sans-serif;font-size:14px}
+.app{display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+.sidebar{background:#161b22;border-right:1px solid #30363d;padding:20px;overflow-y:auto}
+.main{padding:20px;overflow-y:auto}
+h1{font-size:18px;color:#e8d8b0;margin-bottom:16px}
+h2{font-size:14px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;
+   margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid #21262d}
+label{display:block;font-size:12px;color:#8b949e;margin-bottom:3px;margin-top:8px}
+input,select{width:100%;background:#0d1117;border:1px solid #30363d;
+  color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px}
+input:focus,select:focus{outline:none;border-color:#388bfd}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.btn{width:100%;background:#1f6feb;color:#fff;border:none;padding:10px;
+  border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;margin-top:14px}
+.btn:hover{background:#388bfd}
+.btn:disabled{background:#21262d;color:#484f58;cursor:not-allowed}
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid #21262d;padding-bottom:0}
+.tab{padding:8px 16px;cursor:pointer;border-radius:6px 6px 0 0;
+  font-size:13px;color:#8b949e;border:1px solid transparent;border-bottom:none}
+.tab.active{color:#e6edf3;background:#161b22;border-color:#30363d}
+.tab:hover:not(.active){color:#c9d1d9}
+.panel{display:none}.panel.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:#8b949e;font-weight:500;padding:6px 8px;
+   border-bottom:1px solid #21262d;font-size:11px;text-transform:uppercase}
+td{padding:5px 8px;border-bottom:1px solid #161b22}
+tr:hover td{background:#161b22}
+.glyph{font-size:16px}
+.asp-badge{display:inline-block;padding:1px 7px;border-radius:10px;
+  font-size:11px;font-weight:600}
+.retro{color:#ff7b72;font-size:11px}
+#rueda-img{max-width:100%;border-radius:8px;display:block;margin:0 auto}
+#kepler-out{padding:4px}
+#error-box{background:#2d1515;border:1px solid #7c2020;color:#ff7b72;
+  padding:10px;border-radius:6px;margin-top:10px;display:none;font-size:12px;white-space:pre}
+.spinner{text-align:center;color:#8b949e;padding:40px;font-size:13px}
+.badge-asc{display:inline-block;background:#1a3a5a;color:#7fc6ff;
+  padding:3px 10px;border-radius:12px;font-size:12px;margin:2px}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="sidebar">
+  <h1>☉ KeplerDB</h1>
+  <div style="font-size:11px;color:#484f58;margin-bottom:12px">
+    Kepler 4 · Miguel García · 743 textos</div>
+
+  <h2>Datos natales</h2>
+  <label>Nombre</label>
+  <input id="nombre" type="text" value="Abdul Malik" />
+
+  <label>Fecha</label>
+  <div class="row3">
+    <div><label style="font-size:11px">Día</label>
+      <input id="dia" type="number" value="11" min="1" max="31"/></div>
+    <div><label style="font-size:11px">Mes</label>
+      <input id="mes" type="number" value="10" min="1" max="12"/></div>
+    <div><label style="font-size:11px">Año</label>
+      <input id="anio" type="number" value="1976" min="-5000" max="5000"/></div>
+  </div>
+
+  <label>Hora</label>
+  <div class="row2">
+    <div><label style="font-size:11px">Hora</label>
+      <input id="hora" type="number" value="20" min="0" max="23"/></div>
+    <div><label style="font-size:11px">Min</label>
+      <input id="min" type="number" value="33" min="0" max="59"/></div>
+  </div>
+
+  <label>Offset GMT</label>
+  <input id="offset" type="number" value="-1" step="0.5" min="-12" max="14"/>
+
+  <label>Latitud (+ Norte)</label>
+  <input id="lat" type="number" value="40.42" step="0.01"/>
+  <label>Longitud (+ Este)</label>
+  <input id="lon" type="number" value="-3.70" step="0.01"/>
+  <label>Lugar (referencia)</label>
+  <input id="lugar" type="text" value="Madrid, España"/>
+
+  <label>Sistema de casas</label>
+  <select id="sistema">
+    {% for s in sistemas %}
+    <option value="{{s}}" {% if s=='Regiomontanus' %}selected{% endif %}>{{s}}</option>
+    {% endfor %}
+  </select>
+
+  <button class="btn" id="btn-calc" onclick="calcular()">⭐ Calcular Carta Natal</button>
+  <div id="error-box"></div>
+</div>
+
+<div class="main">
+  <div id="placeholder" style="color:#484f58;text-align:center;padding:80px 0;font-size:15px">
+    ← Introduce los datos natales y pulsa Calcular
+  </div>
+  <div id="resultado" style="display:none">
+    <div style="margin-bottom:12px">
+      <span style="font-size:18px;font-weight:700;color:#e8d8b0" id="res-nombre"></span>
+      <span style="color:#8b949e;font-size:13px;margin-left:8px" id="res-fecha"></span>
+    </div>
+    <div style="margin-bottom:14px">
+      <span class="badge-asc">ASC <span id="res-asc"></span></span>
+      <span class="badge-asc" style="background:#1a3a2a;color:#7fdd9f">
+        MC <span id="res-mc"></span></span>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('tabla')">📋 Posiciones</div>
+      <div class="tab" onclick="showTab('aspectos')">⚡ Aspectos</div>
+      <div class="tab" onclick="showTab('rueda')">🔵 Rueda</div>
+      <div class="tab" onclick="showTab('kepler')">📖 Kepler</div>
+    </div>
+
+    <div id="panel-tabla" class="panel active">
+      <table>
+        <thead><tr><th></th><th>Planeta</th><th>Posición</th>
+          <th>Signo</th><th>Casa</th><th></th></tr></thead>
+        <tbody id="tabla-body"></tbody>
+      </table>
+    </div>
+
+    <div id="panel-aspectos" class="panel">
+      <table>
+        <thead><tr><th>Planeta 1</th><th>Aspecto</th>
+          <th>Planeta 2</th><th>Orbe</th></tr></thead>
+        <tbody id="asp-body"></tbody>
+      </table>
+    </div>
+
+    <div id="panel-rueda" class="panel">
+      <img id="rueda-img" alt="Rueda zodiacal"/>
+    </div>
+
+    <div id="panel-kepler" class="panel">
+      <div id="kepler-out"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+function showTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const names=['tabla','aspectos','rueda','kepler'];
+    t.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+async function calcular(){
+  const btn = document.getElementById('btn-calc');
+  const err = document.getElementById('error-box');
+  btn.disabled=true; btn.textContent='Calculando...';
+  err.style.display='none';
+  document.getElementById('placeholder').style.display='none';
+  document.getElementById('resultado').style.display='none';
+
+  const payload = {
+    nombre: document.getElementById('nombre').value,
+    dia:    document.getElementById('dia').value,
+    mes:    document.getElementById('mes').value,
+    anio:   document.getElementById('anio').value,
+    hora:   document.getElementById('hora').value,
+    min:    document.getElementById('min').value,
+    offset: document.getElementById('offset').value,
+    lat:    document.getElementById('lat').value,
+    lon:    document.getElementById('lon').value,
+    sistema:document.getElementById('sistema').value,
+  };
+
+  try {
+    const r = await fetch('/calcular',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if(!data.ok){ err.textContent=data.error; err.style.display='block';
+      btn.disabled=false; btn.textContent='⭐ Calcular Carta Natal'; return; }
+
+    document.getElementById('res-nombre').textContent = data.nombre;
+    document.getElementById('res-fecha').textContent  = data.fecha;
+    document.getElementById('res-asc').textContent    = data.asc;
+    document.getElementById('res-mc').textContent     = data.mc;
+
+    // Tabla planetas
+    const tb = document.getElementById('tabla-body');
+    tb.innerHTML = data.tabla.map(p=>`
+      <tr>
+        <td><span class="glyph" style="color:${p.color}">${p.glyph}</span></td>
+        <td style="font-weight:600">${p.planeta}</td>
+        <td style="font-family:monospace;color:#e6edf3">${p.pos}</td>
+        <td>${p.signo}</td>
+        <td style="color:#8b949e">${p.casa}</td>
+        <td class="retro">${p.retro}</td>
+      </tr>`).join('');
+
+    // Aspectos
+    const ab = document.getElementById('asp-body');
+    ab.innerHTML = data.aspectos.map(a=>`
+      <tr>
+        <td style="font-weight:500">${a.p1}</td>
+        <td><span class="asp-badge" style="background:${a.col}33;color:${a.col}">
+          ${a.asp}</span></td>
+        <td style="font-weight:500">${a.p2}</td>
+        <td style="color:#8b949e;font-size:12px">${a.orb}°</td>
+      </tr>`).join('');
+
+    // Rueda
+    document.getElementById('rueda-img').src = 'data:image/png;base64,'+data.rueda;
+
+    // Kepler
+    document.getElementById('kepler-out').innerHTML = data.kepler;
+
+    document.getElementById('resultado').style.display='block';
+    showTab('tabla');
+  } catch(e){
+    err.textContent = 'Error de red: '+e; err.style.display='block';
+  }
+  btn.disabled=false; btn.textContent='⭐ Calcular Carta Natal';
+}
+
+// Enter para calcular
+document.addEventListener('keydown', e=>{
+  if(e.key==='Enter') calcular();
+});
+</script>
+</body>
+</html>

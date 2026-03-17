@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+informe_test.html
+informe_eduardo.html
+inspect_nb.py
+test_informe.py
