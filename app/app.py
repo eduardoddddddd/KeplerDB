@@ -59,7 +59,7 @@ def asp_short(angle, orbe=8):
     return None, None
 
 def calcular_carta(Y,M,D,h,m,off,lat,lon_geo,sistema='Regiomontanus'):
-    H_utc = (h-off) + m/60.0
+    H_utc = h + off + m/60.0   # off=-1 para UTC+1 (España invierno)
     JD = swe.julday(Y,M,D,H_utc)
     sis_b = SISTEMAS.get(sistema, b'R')
     cusps, ascmc = swe.houses(JD, lat, lon_geo, sis_b)
