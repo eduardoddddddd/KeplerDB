@@ -3,7 +3,7 @@
 # Flask app standalone: calcula carta natal + interpretaciones Kepler
 # Ejecutar: py -X utf8 app.py  →  abre http://localhost:5000
 # =============================================================================
-import sys, os, io, base64
+import sys, os, io, base64, re, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, render_template, request, jsonify

@@ -47,32 +47,42 @@ def _casa(lon, cusps):
 
 def get_planeta(planeta_dash, signo_str, casa_num):
     """
-    Devuelve textos para planeta:
-    - Por signo: PLANETAS.ASC donde planeta1=P AND signo=S
-    - Por casa:  PLANETAS.ASC donde planeta1=P AND casa=C
-    (ambos usan PLANETAS.ASC — confirmado en CASAS.RPN)
+    En PLANETAS.ASC cada bloque es "PLANETA EN SIGNO O CASA N" donde N=número del signo.
+    El Kepler original mostraba UN texto por planeta:
+      - PLANETAS.RPN: busca por signo → bloque índice signo_num
+      - CASAS.RPN:    busca por casa  → bloque índice casa_num
+    Aquí devolvemos ambos SOLO si son distintos, claramente etiquetados.
     """
     p = PLANET_MAP.get(planeta_dash, planeta_dash)
     s = SIGN_MAP.get(signo_str, signo_str)
     conn = _conn(); cur = conn.cursor()
     results = []
-    # texto por signo
-    cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
-        WHERE planeta1=? AND signo=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, s))
+
+    # Texto por SIGNO (primario, siempre)
+    if p == 'Ascendente':
+        cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
+            WHERE planeta1='Ascendente' AND signo=? AND fichero='ASCEN.ASC' LIMIT 1""", (s,))
+    else:
+        cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
+            WHERE planeta1=? AND signo=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, s))
     r = cur.fetchone()
-    if r: results.append(r)
-    # texto por casa (solo si es diferente del de signo)
-    if casa_num != (SIGN_ESP.index(s)+1 if s in SIGN_ESP else -1):
+    if r:
+        results.append(r)
+        signo_casa = r[0]  # cabecera tiene "O CASA N" — extraer N
+        # Si el numero de casa del texto coincide con la casa real, no añadir segundo texto
+        import re as _re
+        m = _re.search(r'CASA\s+(\d+)', signo_casa)
+        casa_en_texto = int(m.group(1)) if m else -1
+    else:
+        casa_en_texto = -1
+
+    # Texto por CASA (solo si la casa real es distinta a la del texto de signo)
+    if casa_num != casa_en_texto and p != 'Ascendente':
         cur.execute("""SELECT cabecera,texto,'casa' FROM interpretaciones
             WHERE planeta1=? AND casa=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, casa_num))
         r = cur.fetchone()
         if r: results.append(r)
-    # Ascendente usa ASCEN.ASC
-    if p == 'Ascendente':
-        cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
-            WHERE planeta1='Ascendente' AND signo=? AND fichero='ASCEN.ASC' LIMIT 1""", (s,))
-        r = cur.fetchone()
-        if r: results = [r]
+
     conn.close()
     return results
 
@@ -148,17 +158,15 @@ def generar_informe_completo(carta_activa):
 
         for cab, texto, tipo in rows:
             if tipo == 'signo':
-                sec.append(f"""<div style="background:#e3f2fd;border-left:4px solid #1976d2;
-                    padding:10px 14px;margin:3px 0 3px 16px;border-radius:0 6px 6px 0">
-                  <div style="font-size:10px;color:#1565c0;font-weight:700;margin-bottom:4px;
-                      text-transform:uppercase">{cab}</div>
-                  <div style="font-size:13px;color:#212121;line-height:1.65">{texto}</div>
-                </div>""")
+                label = f'📍 Por signo — {cab}'
+                bg_col = '#e3f2fd'; borde = '#1976d2'; txt_col = '#1565c0'
             else:
-                sec.append(f"""<div style="background:#f1f8e9;border-left:4px solid #558b2f;
+                label = f'🏠 Por casa {casa} — {cab}'
+                bg_col = '#fff8e1'; borde = '#f9a825'; txt_col = '#e65100'
+            sec.append(f"""<div style="background:{bg_col};border-left:4px solid {borde};
                     padding:10px 14px;margin:3px 0 3px 16px;border-radius:0 6px 6px 0">
-                  <div style="font-size:10px;color:#558b2f;font-weight:700;margin-bottom:4px;
-                      text-transform:uppercase">{cab}</div>
+                  <div style="font-size:10px;color:{txt_col};font-weight:700;margin-bottom:4px;
+                      text-transform:uppercase;letter-spacing:.04em">{label}</div>
                   <div style="font-size:13px;color:#212121;line-height:1.65">{texto}</div>
                 </div>""")
             n_bloques += 1
