@@ -191,6 +191,11 @@ tr:hover td{background:#fafafa}
           background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:14px">
         <div>
           <div style="font-size:12px;font-weight:700;color:#4a148c;margin-bottom:8px">👤 Persona 1</div>
+          <select id="s1_carta" onchange="cargarCartaEnSinastria('s1',this.value)"
+            style="width:100%;margin-bottom:6px;background:#e8eaf6;border:1px solid #9fa8da;
+                   color:#283593;padding:5px 8px;border-radius:6px;font-size:12px">
+            <option value="">— Cargar carta guardada —</option>
+          </select>
           <label style="font-size:11px;color:#616161">Nombre</label>
           <input id="s1_nombre" type="text" style="width:100%;margin-bottom:6px"/>
           <div style="display:flex;gap:4px;margin-bottom:4px">
@@ -210,6 +215,11 @@ tr:hover td{background:#fafafa}
         </div>
         <div>
           <div style="font-size:12px;font-weight:700;color:#1a237e;margin-bottom:8px">👤 Persona 2</div>
+          <select id="s2_carta" onchange="cargarCartaEnSinastria('s2',this.value)"
+            style="width:100%;margin-bottom:6px;background:#e8eaf6;border:1px solid #9fa8da;
+                   color:#283593;padding:5px 8px;border-radius:6px;font-size:12px">
+            <option value="">— Cargar carta guardada —</option>
+          </select>
           <label style="font-size:11px;color:#616161">Nombre</label>
           <input id="s2_nombre" type="text" style="width:100%;margin-bottom:6px"/>
           <div style="display:flex;gap:4px;margin-bottom:4px">
@@ -274,6 +284,11 @@ async function listarCartas(){
       </span>
       <span style="cursor:pointer;color:#c62828;font-size:12px" onclick="borrarCarta('${c.file}')">✕</span>
     </div>`).join('');
+  // Poblar selects de sinastría
+  const opts = '<option value="">— Cargar carta guardada —</option>' +
+    d.cartas.map(c=>`<option value="${c.file}">${c.nombre} (${c.fecha})</option>`).join('');
+  document.getElementById('s1_carta').innerHTML = opts;
+  document.getElementById('s2_carta').innerHTML = opts;
 }
 
 async function guardarCarta(){
@@ -412,15 +427,28 @@ document.addEventListener('keydown', e=>{
 function cargarNatalEnSinastria(){
   const c = window._cartaActual;
   if(!c){ alert('Primero calcula una carta natal.'); return; }
-  document.getElementById('s1_nombre').value = c.nombre||'';
-  document.getElementById('s1_dia').value    = c.dia||'';
-  document.getElementById('s1_mes').value    = c.mes||'';
-  document.getElementById('s1_anio').value   = c.anio||'';
-  document.getElementById('s1_hora').value   = c.hora||'';
-  document.getElementById('s1_min').value    = c.min||'';
-  document.getElementById('s1_offset').value = c.offset||'';
-  document.getElementById('s1_lat').value    = c.lat||'';
-  document.getElementById('s1_lon').value    = c.lon||'';
+  _rellenarSinastria('s1', c);
+}
+
+async function cargarCartaEnSinastria(prefix, file){
+  if(!file) return;
+  const r = await fetch('/cartas/cargar/'+file);
+  const d = await r.json();
+  if(!d.ok){ alert(d.error); return; }
+  const c = d.carta;
+  _rellenarSinastria(prefix, c);
+}
+
+function _rellenarSinastria(prefix, c){
+  document.getElementById(prefix+'_nombre').value = c.nombre||'';
+  document.getElementById(prefix+'_dia').value    = c.dia||'';
+  document.getElementById(prefix+'_mes').value    = c.mes||'';
+  document.getElementById(prefix+'_anio').value   = c.anio||'';
+  document.getElementById(prefix+'_hora').value   = c.hora||'';
+  document.getElementById(prefix+'_min').value    = c.min||'';
+  document.getElementById(prefix+'_offset').value = c.offset||'';
+  document.getElementById(prefix+'_lat').value    = c.lat||'';
+  document.getElementById(prefix+'_lon').value    = c.lon||'';
 }
 
 async function calcularSinastria(){
