@@ -1,151 +1,155 @@
-# KeplerDB — Kepler 4 de Miguel García en Python moderno
+# KeplerDB 🔭
 
-**Versión:** 1.2  
-**Autor:** Eduardo Abdul Malik Arias  
-**Descripción:** Migración completa del programa de astrología Kepler 4 (DOS, años 90) de Miguel García a una aplicación web moderna con Flask, SQLite y pyswisseph.
+Aplicación web local que reproduce las interpretaciones astrológicas del programa **Kepler 4** (Miguel García, 1985) sobre cálculos astronómicos precisos con **pyswisseph** (Swiss Ephemeris).
 
----
+## Stack
 
-## 🚀 Cómo lanzar la aplicación
+| Capa | Tecnología |
+|---|---|
+| Backend | Python 3.12 · Flask |
+| Astronomía | pyswisseph (Swiss Ephemeris) |
+| Base de datos | SQLite (`kepler.db`) · 597 textos originales |
+| Frontend | HTML/CSS/JS vanilla (sin dependencias) |
+| Gráficos | matplotlib (rueda zodiacal) |
 
-### Opción 1 — Doble clic (más fácil)
-```
-Doble clic en: ARRANCAR.bat
-```
-El navegador se abre solo en `http://localhost:5000`
+## Arranque
 
-### Opción 2 — Línea de comandos
-```bat
-cd C:\Users\Edu\Documents\ClaudeWork\KeplerDB
+```bash
 py -X utf8 app\app.py
-```
-Luego abre `http://localhost:5000` en el navegador.
-
-### Para cerrar la app
-Cierra la ventana de comando que se abrió, o pulsa `Ctrl+C` en ella.
-
-> **No es un HTML estático** — es una app Flask (Python) que necesita estar ejecutándose.
-> El navegador solo muestra la interfaz; todos los cálculos se hacen en Python local.
-
----
-
-## 📋 Requisitos
-
-```
-Python 3.12+
-pip install flask pyswisseph matplotlib numpy
+# → http://localhost:5000
 ```
 
-Todos instalados en el sistema. Si falta alguno:
-```bat
-pip install flask pyswisseph matplotlib numpy
-```
-
----
-
-## 🗂️ Estructura del proyecto
+## Estructura del proyecto
 
 ```
 KeplerDB/
-├── ARRANCAR.bat              ← Doble clic para lanzar
 ├── app/
-│   ├── app.py                ← Servidor Flask (cálculos, rutas API)
+│   ├── app.py              # Servidor Flask + endpoints
 │   └── templates/
-│       └── index.html        ← Interfaz web
-├── kepler.db                 ← Base de datos SQLite con todos los textos
-├── kepler_interp.py          ← Motor de interpretaciones (consulta kepler.db)
-├── build_kepler_db.py        ← Regenera kepler.db desde los .ASC originales
-├── README.md                 ← Este fichero
-└── test_db.py                ← Tests de consulta SQL
+│       └── index.html      # UI completa (single-page)
+├── kepler_interp.py        # Motor de interpretaciones (consulta kepler.db)
+├── kepler.db               # Base de datos SQLite con textos Kepler 4
+└── README.md
 ```
 
-Las cartas guardadas se almacenan en `~/astro_cartas/` (JSON).
+## Base de datos — kepler.db
 
----
+597 textos extraídos del Kepler 4 original, distribuidos en 6 ficheros:
 
-## 🔧 Funcionalidades
+| Fichero | Registros | Contenido |
+|---|---|---|
+| `PLANETAS.ASC` | 120 | 10 planetas × 12 signos/casas |
+| `REGENTES.ASC` | 144 | Regente de casa N en casa M (12×12) |
+| `ASPECTOS.ASC` | 136 | Aspectos entre planetas (Conj/Armónico/Tensión) |
+| `ASCEN.ASC` | 12 | Ascendente en cada signo |
+| `SOL.ASC` | 12 | Sol en cada signo (textos extendidos) |
+| `PAREJA.ASC` | 173 | Sinastría: aspectos entre planetas de dos cartas |
 
-### Carta natal
-- Cálculo con pyswisseph (efemérides suizas precisas)
-- Sistema de casas: Placidus (default), Koch, Whole Sign, Equal, Campanus, Regiomontanus
-- 4 tabs: **Posiciones · Aspectos · Rueda zodiacal · Interpretaciones Kepler**
+### Codificación PAREJA.ASC
 
-### Interpretaciones Kepler (tab 📖)
-- Textos originales del Kepler 4 de Miguel García
-- **Por signo**: texto para cada planeta en su signo zodiacal
-- **Por casa**: texto para cada planeta en su casa (cuando signo ≠ casa)
-- **Aspectos**: Conjunción / Armónico (trígono+sextil) / Tensión (cuad+opoc)
-- 597 bloques interpretativos en español
+Clave: `XYZ` donde X=planeta1, Y=planeta2, Z=B(enigno)/M(aligno)
 
-### Guardar/cargar cartas
-- Botón **💾 Guardar Carta** tras calcular
-- Panel lateral con lista de cartas guardadas
-- Click en nombre → carga y recalcula automáticamente
-- **✕** para borrar
+| Código | Planeta |
+|---|---|
+| E | Sol | L | Luna | H | Mercurio | V | Venus | M | Marte |
+| J | Júpiter | S | Saturno | U | Urano | N | Neptuno | P | Plutón |
+| A | ASC | C | MC | D | Nodo Norte |
 
----
+B = Conjunción/Trígono/Sextil · M = Cuadratura/Oposición
 
-## 🗃️ Base de datos
+## Funcionalidades
 
-```sql
--- Texto para un planeta en su signo
-SELECT cabecera, texto FROM interpretaciones
-WHERE planeta1='Sol' AND signo='Libra' AND fichero='PLANETAS.ASC';
+### 1. Carta Natal
+- Cálculo con pyswisseph: 10 planetas + Nodo Norte verdadero
+- Sistemas de casas: Placidus, Koch, Regiomontanus, Whole Sign, Equal, Campanus
+- Rueda zodiacal (matplotlib, fondo blanco, colores pastel por elemento)
+- Tabla de posiciones con grado/signo/casa/retrogradación
+- Tabla de aspectos con orbe
+- Guardar/cargar/borrar cartas (JSON en `~/astro_cartas/`)
 
--- Texto para un planeta en su casa
-SELECT cabecera, texto FROM interpretaciones
-WHERE planeta1='Luna' AND casa=12 AND fichero='PLANETAS.ASC';
+### 2. Informe Kepler (tab 📖)
+Secciones en orden:
 
--- Aspecto entre dos planetas
-SELECT aspecto, cabecera, texto FROM interpretaciones
-WHERE planeta1='Sol' AND planeta2='Saturno' AND fichero='ASPECTOS.ASC';
--- aspecto puede ser: Conjunción / Armónico / Tensión
+1. **🌅 Ascendente** — texto ASCEN.ASC para el signo ascendente
+2. **⚖️ Mayorías Planetarias** — conteo por elemento (Fuego/Tierra/Aire/Agua) y modalidad (Cardinal/Fijo/Mutable) con tarjetas de color
+3. **🪐 Planetas en Signo** — para cada planeta:
+   - ☉ Texto SOL.ASC (solo Sol, más descriptivo)
+   - 📍 Texto por signo (PLANETAS.ASC)
+   - 🏠 Texto por casa si difiere del signo
+4. **⚡ Aspectos** — textos ASPECTOS.ASC para cada aspecto activo (orbe 8°)
+5. **🏛️ Regentes de Casas** — para cada casa: regente clásico, su posición y texto REGENTES.ASC
 
--- Buscar texto libre
-SELECT i.cabecera, i.texto
-FROM interpretaciones_fts fts JOIN interpretaciones i ON fts.rowid=i.id
-WHERE interpretaciones_fts MATCH 'voluntad energía' ORDER BY rank LIMIT 5;
+### 3. Tránsitos (tab 🌍)
+- Selector de fecha (rellena automáticamente con hoy)
+- Calcula planetas transitantes con pyswisseph para esa fecha
+- Orbes diferenciados: Luna 1°, Sol/inferiores 2°, superiores (Jup-Plu) 3°
+- Detecta retrogradación (muestra ℞)
+- Textos de ASPECTOS.ASC (mismos que natal — Kepler 4 no distinguía)
+- Ordenados: primero los que tienen texto, luego por orbe creciente
+- Aspectos sin texto se muestran atenuados (sin texto en DB)
 
--- Cartas de famosos
-SELECT nombre, lugar, anio, mes, dia, descripcion FROM cartas
-WHERE fichero_origen='FAMOSOS.DAT' ORDER BY nombre;
+### 4. Sinastría (tab 💞)
+- Formulario independiente para 2 personas (con botón "Cargar carta natal → P1")
+- Orbe configurable (por defecto 6°)
+- Busca aspectos entre todos los planetas de P1 y P2 (incluye ASC y MC)
+- Textos de PAREJA.ASC — busca en ambos órdenes (XY e YX)
+- Iconos astrológicos: ☌ △ ⚹ □ ☍
+- Ordenados: con texto primero, luego por orbe
+
+## Motor de interpretaciones — kepler_interp.py
+
+Funciones principales:
+
+```python
+get_planeta(planeta, signo, casa)      # Textos PLANETAS.ASC + SOL.ASC
+get_aspecto(p1, p2, asp)               # Texto ASPECTOS.ASC
+get_transito(p_trans, p_natal, asp)    # Alias de get_aspecto para tránsitos
+get_regente(casa_origen, casa_regente) # Texto REGENTES.ASC
+get_sinastria(p1, p2, asp)             # Texto PAREJA.ASC
+mayorias_planetarias(planets_lon)      # Conteo por elemento y modalidad
+generar_informe_completo(carta)        # HTML completo del informe natal
+generar_informe_sinastria(c1, c2)      # HTML completo de sinastría
 ```
 
----
+### Nombres de planetas (dashboard → DB)
 
-## 🔄 Regenerar la base de datos
-
-Si tienes acceso al directorio original del Kepler 4:
-```bat
-py -X utf8 build_kepler_db.py
+```python
+PLANET_MAP = {
+    'Sol':'Sol', 'Luna':'Luna', 'Mercurio':'Mercurio', 'Venus':'Venus',
+    'Marte':'Marte', 'Jupiter':'Júpiter', 'Saturno':'Saturno',
+    'Urano':'Urano', 'Neptuno':'Neptuno', 'Pluton':'Plutón',
+    'NodoN':'Nodo Norte', 'ASC':'Ascendente', 'MC':'Medio Cielo',
+}
 ```
-Requiere `C:\Program Files (x86)\Kepler 4\` con los ficheros `.ASC` originales.
 
----
-
-## 📡 API endpoints (Flask)
+## Endpoints Flask
 
 | Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/calcular` | Calcula carta natal completa |
-| GET | `/cartas/listar` | Lista cartas guardadas |
-| POST | `/cartas/guardar` | Guarda carta actual |
-| GET | `/cartas/cargar/<nombre>` | Carga carta por nombre |
-| DELETE | `/cartas/borrar/<nombre>` | Borra carta |
+|---|---|---|
+| POST | `/calcular` | Carta natal completa (planetas, casas, aspectos, rueda, informe Kepler) |
+| POST | `/transitos` | Tránsitos de una fecha sobre carta natal |
+| POST | `/sinastria` | Sinastría entre dos cartas |
+| POST | `/cartas/guardar` | Guardar carta como JSON |
+| GET | `/cartas/listar` | Listar cartas guardadas |
+| GET | `/cartas/cargar/<nombre>` | Cargar carta guardada |
+| DELETE | `/cartas/borrar/<nombre>` | Borrar carta guardada |
 
----
+## Regencias clásicas usadas para Regentes
 
-## 📖 Sobre el Kepler 4 original
+Marte→Aries/Escorpio · Venus→Tauro/Libra · Mercurio→Géminis/Virgo  
+Luna→Cáncer · Sol→Leo · Júpiter→Sagitario/Piscis · Saturno→Capricornio/Acuario
 
-El **Kepler 4** fue desarrollado por **Miguel García Ferrández** (matemático, Orihuela 1952),
-junto a **Tito Maciá** para investigación astrológica. Programa DOS de los años 90, muy valorado
-en el mundo hispanohablante por sus gráficos claros y sistema interpretativo.
+## Notas técnicas
 
-Los textos interpretativos están en ficheros `.ASC` (CP850) con separadores `#`.
-El motor de selección usa un lenguaje propio **RPN** (Reverse Polish Notation) que indexa
-los bloques de texto por número de signo (1=Aries...12=Piscis) y casa.
+- Ejecutar siempre con `py -X utf8` para evitar problemas de encoding en Windows
+- Flask en modo `debug=False` — matar proceso antes de relanzar (no recarga automático)
+- `importlib.reload(ki)` en cada request para desarrollo sin reinicio
+- Cartas guardadas en `%USERPROFILE%\astro_cartas\` como JSON
+- DB en ruta absoluta: `C:\Users\Edu\Documents\ClaudeWork\KeplerDB\kepler.db`
 
-Los aspectos se agrupan en tres categorías:
-- **Conjunción** — aspectos de 0°
-- **Armónico** — trígono (120°) y sextil (60°)
-- **Tensión** — cuadratura (90°) y oposición (180°)
+## Roadmap pendiente
+
+- [ ] Tab Famosos/Eventos — búsqueda en tabla `cartas` (8502 registros)
+- [ ] Retorno Solar
+- [ ] Firdaria / Profecciones anuales
+- [ ] Exportar informe a PDF

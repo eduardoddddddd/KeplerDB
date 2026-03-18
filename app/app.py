@@ -247,6 +247,107 @@ def calcular():
 CARTAS_DIR = os.path.join(os.path.expanduser('~'), 'astro_cartas')
 os.makedirs(CARTAS_DIR, exist_ok=True)
 
+# ── Orbes y tablas para tránsitos ────────────────────────────────────────────
+ORBES_TRANS = {
+    'Sol':2,'Luna':1,'Mercurio':2,'Venus':2,'Marte':2,
+    'Jupiter':3,'Saturno':3,'Urano':3,'Neptuno':3,'Pluton':3,'NodoN':2
+}
+ASP_CLR_T = {'Conj':'#f57f17','Trig':'#2e7d32','Sext':'#1565c0',
+             'Cuad':'#c62828','Opoc':'#880e4f'}
+ASP_BG_T  = {'Conj':'#fffde7','Trig':'#e8f5e9','Sext':'#e3f2fd',
+             'Cuad':'#fce4ec','Opoc':'#fce4ec'}
+ASP_FULL_T= {'Conj':'Conjunción','Sext':'Sextil','Cuad':'Cuadratura',
+             'Trig':'Trígono','Opoc':'Oposición'}
+
+
+@app.route('/transitos', methods=['POST'])
+def transitos():
+    try:
+        d = request.json
+        YT,MT,DT = int(d['t_anio']), int(d['t_mes']), int(d['t_dia'])
+        hT = int(d.get('t_hora', 12)); mT = int(d.get('t_min', 0))
+        offT = float(d.get('offset', -1))
+        YN,MN,DN = int(d['anio']), int(d['mes']), int(d['dia'])
+        hN,mN,offN = int(d['hora']), int(d['min']), float(d['offset'])
+        latN = float(d['lat']); lonN = float(d['lon'])
+        sistema = d.get('sistema', 'Regiomontanus')
+
+        carta_natal = calcular_carta(YN,MN,DN,hN,mN,offN,latN,lonN,sistema)
+        natal_lons  = carta_natal['planets']
+
+        H_utc_t = hT + offT + mT/60.0
+        JD_t    = swe.julday(YT,MT,DT,H_utc_t)
+        planets_trans = {}
+        for name, pid in PLANET_IDS.items():
+            res = swe.calc_ut(JD_t, pid)
+            planets_trans[name] = {'lon': res[0][0], 'spd': res[0][3]}
+
+        import importlib; importlib.reload(ki)
+        aspectos = []
+        ORDEN_T = ['Sol','Luna','Mercurio','Venus','Marte',
+                   'Jupiter','Saturno','Urano','Neptuno','Pluton']
+        ORDEN_N = ['Sol','Luna','Mercurio','Venus','Marte','Jupiter',
+                   'Saturno','Urano','Neptuno','Pluton','NodoN']
+
+        for pt in ORDEN_T:
+            if pt not in planets_trans: continue
+            pt_data  = planets_trans[pt]
+            orbe_max = ORBES_TRANS.get(pt, 2)
+            for pn in ORDEN_N:
+                if pn not in natal_lons: continue
+                ang = abs(pt_data['lon'] - natal_lons[pn]) % 360
+                if ang > 180: ang = 360 - ang
+                asp_s, orb = asp_short(ang, orbe=orbe_max)
+                if not asp_s: continue
+                row    = ki.get_transito(pt, pn, asp_s)
+                retro  = ' ℞' if pt_data['spd'] < 0 else ''
+                aspectos.append({
+                    'trans': pt, 'natal': pn,
+                    'asp': ASP_FULL_T.get(asp_s, asp_s),
+                    'asp_short': asp_s,
+                    'orb': orb, 'retro': retro,
+                    'col': ASP_CLR_T.get(asp_s, '#555'),
+                    'bg':  ASP_BG_T.get(asp_s, '#f9f9f9'),
+                    'cab':   row[0] if row else None,
+                    'texto': row[1] if row else None,
+                })
+
+        aspectos.sort(key=lambda x: (0 if x['texto'] else 1, x['orb']))
+        fecha_str = f'{DT:02d}/{MT:02d}/{YT}'
+        return jsonify({'ok': True, 'aspectos': aspectos,
+                        'fecha_trans': fecha_str,
+                        'n_total': len(aspectos),
+                        'n_texto': sum(1 for a in aspectos if a['texto'])})
+    except Exception as e:
+        import traceback
+        return jsonify({'ok': False, 'error': traceback.format_exc()})
+
+
+@app.route('/sinastria', methods=['POST'])
+def sinastria():
+    try:
+        d = request.json
+        orbe = int(d.get('orbe', 6))
+        def _parse_carta(prefix):
+            Y,M,D_ = int(d[f'{prefix}anio']),int(d[f'{prefix}mes']),int(d[f'{prefix}dia'])
+            h,m_,off = int(d[f'{prefix}hora']),int(d[f'{prefix}min']),float(d[f'{prefix}offset'])
+            lat,lon_ = float(d[f'{prefix}lat']),float(d[f'{prefix}lon'])
+            sis  = d.get(f'{prefix}sistema','Regiomontanus')
+            nombre = d.get(f'{prefix}nombre','Persona')
+            carta = calcular_carta(Y,M,D_,h,m_,off,lat,lon_,sis)
+            carta['nombre'] = nombre
+            return carta
+        carta1 = _parse_carta('p1_')
+        carta2 = _parse_carta('p2_')
+        import importlib; importlib.reload(ki)
+        html = ki.generar_informe_sinastria(carta1, carta2, orbe=orbe)
+        return jsonify({'ok': True, 'html': html,
+                        'nombre1': carta1['nombre'], 'nombre2': carta2['nombre']})
+    except Exception as e:
+        import traceback
+        return jsonify({'ok': False, 'error': traceback.format_exc()})
+
+
 @app.route('/cartas/guardar', methods=['POST'])
 def guardar_carta():
     try:

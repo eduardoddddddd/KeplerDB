@@ -31,6 +31,27 @@ ASPECT_MAP = {
 SIGN_ESP = ['Aries','Tauro','Géminis','Cáncer','Leo','Virgo',
             'Libra','Escorpio','Sagitario','Capricornio','Acuario','Piscis']
 
+ELEMENTOS = {
+    'Fuego': ['Aries','Leo','Sagitario'],
+    'Tierra': ['Tauro','Virgo','Capricornio'],
+    'Aire':   ['Géminis','Libra','Acuario'],
+    'Agua':   ['Cáncer','Escorpio','Piscis'],
+}
+MODALIDADES = {
+    'Cardinal': ['Aries','Cáncer','Libra','Capricornio'],
+    'Fijo':     ['Tauro','Leo','Escorpio','Acuario'],
+    'Mutable':  ['Géminis','Virgo','Sagitario','Piscis'],
+}
+ELEM_ICONS  = {'Fuego':'🔥','Tierra':'🌍','Aire':'💨','Agua':'💧'}
+MODAL_ICONS = {'Cardinal':'⚡','Fijo':'🔷','Mutable':'🔄'}
+
+# Regencias clásicas (dashboard key → nombre dashboard)
+SIGN_RULER_CLASSIC = {
+    'Aries':'Marte','Tauro':'Venus','Géminis':'Mercurio','Cáncer':'Luna',
+    'Leo':'Sol','Virgo':'Mercurio','Libra':'Venus','Escorpio':'Marte',
+    'Sagitario':'Jupiter','Capricornio':'Saturno','Acuario':'Saturno','Piscis':'Jupiter'
+}
+
 def _conn(): return sqlite3.connect(DB_PATH)
 
 def _signo(lon): return SIGN_ESP[int((lon % 360) / 30)]
@@ -47,18 +68,22 @@ def _casa(lon, cusps):
 
 def get_planeta(planeta_dash, signo_str, casa_num):
     """
-    En PLANETAS.ASC cada bloque es "PLANETA EN SIGNO O CASA N" donde N=número del signo.
-    El Kepler original mostraba UN texto por planeta:
-      - PLANETAS.RPN: busca por signo → bloque índice signo_num
-      - CASAS.RPN:    busca por casa  → bloque índice casa_num
-    Aquí devolvemos ambos SOLO si son distintos, claramente etiquetados.
+    Textos de planeta en signo y casa (PLANETAS.ASC).
+    Para Sol además añade el texto de SOL.ASC (más detallado).
     """
     p = PLANET_MAP.get(planeta_dash, planeta_dash)
     s = SIGN_MAP.get(signo_str, signo_str)
     conn = _conn(); cur = conn.cursor()
     results = []
 
-    # Texto por SIGNO (primario, siempre)
+    # SOL.ASC — texto adicional solo para el Sol
+    if p == 'Sol':
+        cur.execute("""SELECT cabecera,texto,'sol' FROM interpretaciones
+            WHERE planeta1='Sol' AND signo=? AND fichero='SOL.ASC' LIMIT 1""", (s,))
+        r = cur.fetchone()
+        if r: results.append(r)
+
+    # Texto por SIGNO en PLANETAS.ASC (primario)
     if p == 'Ascendente':
         cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
             WHERE planeta1='Ascendente' AND signo=? AND fichero='ASCEN.ASC' LIMIT 1""", (s,))
@@ -68,15 +93,13 @@ def get_planeta(planeta_dash, signo_str, casa_num):
     r = cur.fetchone()
     if r:
         results.append(r)
-        signo_casa = r[0]  # cabecera tiene "O CASA N" — extraer N
-        # Si el numero de casa del texto coincide con la casa real, no añadir segundo texto
         import re as _re
-        m = _re.search(r'CASA\s+(\d+)', signo_casa)
+        m = _re.search(r'CASA\s+(\d+)', r[0])
         casa_en_texto = int(m.group(1)) if m else -1
     else:
         casa_en_texto = -1
 
-    # Texto por CASA (solo si la casa real es distinta a la del texto de signo)
+    # Texto por CASA si distinta al signo
     if casa_num != casa_en_texto and p != 'Ascendente':
         cur.execute("""SELECT cabecera,texto,'casa' FROM interpretaciones
             WHERE planeta1=? AND casa=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, casa_num))
@@ -94,6 +117,171 @@ def get_aspecto(p1_dash, p2_dash, asp_dash):
         WHERE aspecto=? AND ((planeta1=? AND planeta2=?) OR (planeta1=? AND planeta2=?))
         AND fichero='ASPECTOS.ASC' LIMIT 1""", (asp,p1,p2,p2,p1))
     row=cur.fetchone(); conn.close(); return row
+
+def get_regente(casa_origen, casa_del_regente):
+    """
+    Texto REGENTES.ASC: regente de casa N ubicado en casa M.
+    Cabecera en DB: 'REGENTE DE CASA N EN SIGNO O CASA M' (M = índice natural del signo).
+    Consulta por LIKE para tolerar variantes de formato.
+    """
+    conn = _conn(); cur = conn.cursor()
+    cur.execute("""SELECT cabecera, texto FROM interpretaciones
+        WHERE fichero='REGENTES.ASC'
+        AND cabecera LIKE ? LIMIT 1""",
+        (f'REGENTE DE CASA {casa_origen} %CASA {casa_del_regente}',))
+    row = cur.fetchone(); conn.close(); return row
+
+
+def mayorias_planetarias(planets_lon):
+    """
+    Cuenta planetas por elemento y modalidad.
+    Devuelve dict con conteos y lista de planetas por grupo.
+    """
+    ORDEN = ['Sol','Luna','Mercurio','Venus','Marte','Jupiter',
+             'Saturno','Urano','Neptuno','Pluton','NodoN']
+    elem_count  = {k: [] for k in ELEMENTOS}
+    modal_count = {k: [] for k in MODALIDADES}
+    for pname in ORDEN:
+        if pname not in planets_lon: continue
+        sig = _signo(planets_lon[pname])
+        for elem, signs in ELEMENTOS.items():
+            if sig in signs: elem_count[elem].append(pname)
+        for mod, signs in MODALIDADES.items():
+            if sig in signs: modal_count[mod].append(pname)
+    return {'elementos': elem_count, 'modalidades': modal_count}
+
+
+def get_transito(p_trans_dash, p_natal_dash, asp_dash):
+    """Tránsito: reutiliza ASPECTOS.ASC."""
+    return get_aspecto(p_trans_dash, p_natal_dash, asp_dash)
+
+
+# Códigos PAREJA.ASC: primera letra = planeta, tercera = B(enigno)/M(aligno)
+_PAREJA_CODE = {
+    'Sol':'E','Luna':'L','Mercurio':'H','Venus':'V','Marte':'M',
+    'Jupiter':'J','Saturno':'S','Urano':'U','Neptuno':'N','Pluton':'P',
+    'NodoN':'D','ASC':'A','MC':'C',
+}
+# Aspecto → B o M
+_PAREJA_TIPO = {
+    'Conj':'B','Trig':'B','Sext':'B',   # benignos
+    'Cuad':'M','Opoc':'M',              # malignos
+}
+_PAREJA_TIPO_FULL = {
+    'Conj':'Conjunción','Trig':'Trígono','Sext':'Sextil',
+    'Cuad':'Cuadratura','Opoc':'Oposición',
+}
+
+
+def get_sinastria(p1_dash, p2_dash, asp_dash):
+    """
+    Texto de sinastría: busca en PAREJA.ASC por cabecera 'Sinastría XYZ'.
+    X=código p1, Y=código p2, Z=B|M.
+    Intenta ambos órdenes XY e YX (matriz triangular en DB).
+    """
+    c1 = _PAREJA_CODE.get(p1_dash)
+    c2 = _PAREJA_CODE.get(p2_dash)
+    t  = _PAREJA_TIPO.get(asp_dash)
+    if not c1 or not c2 or not t:
+        return None
+    conn = _conn(); cur = conn.cursor()
+    for key in (f'{c1}{c2}{t}', f'{c2}{c1}{t}'):
+        cur.execute("""SELECT cabecera,texto FROM interpretaciones
+            WHERE fichero='PAREJA.ASC' AND cabecera=? LIMIT 1""",
+            (f'Sinastría {key}',))
+        row = cur.fetchone()
+        if row:
+            conn.close(); return row
+    conn.close(); return None
+
+
+def generar_informe_sinastria(carta1, carta2, orbe=6):
+    """
+    Genera informe HTML de sinastría entre dos cartas.
+    carta1/carta2: misma estructura que carta_activa (nombre, planets, ASC, MC, cusps).
+    Busca aspectos p1→p2 con orbe dado y textos en PAREJA.ASC.
+    """
+    nombre1 = carta1.get('nombre','Persona 1')
+    nombre2 = carta2.get('nombre','Persona 2')
+    lons1   = carta1.get('planets', {})
+    lons2   = carta2.get('planets', {})
+    # Añadir ASC y MC de ambas cartas
+    if carta1.get('ASC'): lons1 = dict(lons1, ASC=carta1['ASC'])
+    if carta1.get('MC'):  lons1 = dict(lons1, MC=carta1['MC'])
+    if carta2.get('ASC'): lons2 = dict(lons2, ASC=carta2['ASC'])
+    if carta2.get('MC'):  lons2 = dict(lons2, MC=carta2['MC'])
+
+    ORDEN = ['Sol','Luna','Mercurio','Venus','Marte','Jupiter',
+             'Saturno','Urano','Neptuno','Pluton','NodoN','ASC','MC']
+    ASP_COLS = {'Conj':'#f57f17','Trig':'#2e7d32','Sext':'#1565c0',
+                'Cuad':'#c62828','Opoc':'#880e4f'}
+    ASP_BGS  = {'Conj':'#fffde7','Trig':'#e8f5e9','Sext':'#e3f2fd',
+                'Cuad':'#fce4ec','Opoc':'#fce4ec'}
+    ASP_ICONS= {'Conj':'☌','Trig':'△','Sext':'⚹','Cuad':'□','Opoc':'☍'}
+
+    sec = []
+    sec.append(f"""<div style="background:#4a148c;color:#fff;padding:14px 18px;
+        border-radius:8px;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:700">💞 Sinastría Kepler 4</div>
+      <div style="font-size:13px;color:#e1bee7;margin-top:4px">
+        {nombre1} ↔ {nombre2} · Orbe ±{orbe}°</div>
+    </div>""")
+
+    n_con_texto = 0; n_sin_texto = 0
+    bloques = []
+
+    for p1 in ORDEN:
+        if p1 not in lons1: continue
+        lon1 = lons1[p1]
+        for p2 in ORDEN:
+            if p2 not in lons2: continue
+            lon2 = lons2[p2]
+            ang  = abs(lon1 - lon2) % 360
+            if ang > 180: ang = 360 - ang
+            asp_s, orb_val = _asp_short(ang, orbe=orbe)
+            if not asp_s: continue
+            row = get_sinastria(p1, p2, asp_s)
+            col  = ASP_COLS.get(asp_s,'#555')
+            bg   = ASP_BGS.get(asp_s,'#f9f9f9')
+            icon = ASP_ICONS.get(asp_s,'·')
+            af   = _PAREJA_TIPO_FULL.get(asp_s, asp_s)
+            if row:
+                n_con_texto += 1
+            else:
+                n_sin_texto += 1
+            bloques.append((orb_val, p1, p2, asp_s, af, icon, col, bg, orb_val, row))
+
+    bloques.sort(key=lambda x: (0 if x[9] else 1, x[0]))
+
+    for (_, p1, p2, asp_s, af, icon, col, bg, orb_val, row) in bloques:
+        sig1 = _signo(lons1[p1]); sig2 = _signo(lons2[p2])
+        txt_bloque = ''
+        if row:
+            txt_bloque = f"""<div style="font-size:13px;color:#212121;line-height:1.65;
+                margin-top:6px;border-top:1px solid rgba(0,0,0,.07);padding-top:6px">{row[1]}</div>"""
+        opacity = '' if row else 'opacity:0.6;'
+        sec.append(f"""<div style="background:{bg};border-left:4px solid {col};
+            padding:9px 14px;margin:4px 0;border-radius:0 6px 6px 0;{opacity}">
+          <div style="font-size:12px;font-weight:700;color:{col}">
+            <span style="font-size:15px">{icon}</span>
+            <span style="color:#1a237e;margin:0 4px">{nombre1}</span>
+            <b>{p1}</b> <span style="color:#757575;font-size:11px">({sig1})</span>
+            <span style="font-weight:400;margin:0 4px">{af}</span>
+            <span style="color:#4a148c;margin:0 4px">{nombre2}</span>
+            <b>{p2}</b> <span style="color:#757575;font-size:11px">({sig2})</span>
+            <span style="font-size:11px;font-weight:400;color:#9e9e9e;margin-left:6px">orbe {orb_val}°</span>
+          </div>{txt_bloque}
+        </div>""")
+
+    if not bloques:
+        sec.append('<p style="color:#888;font-style:italic">Sin aspectos en el orbe indicado.</p>')
+
+    sec.append(f"""<div style="margin-top:16px;padding:8px 14px;background:#f3e5f5;
+        border-radius:6px;font-size:11px;color:#6a1b9a;border:1px solid #ce93d8">
+      PAREJA.ASC · {n_con_texto} aspectos con texto · {n_sin_texto} sin texto en DB
+    </div>""")
+    return '\n'.join(sec)
+
 
 def busqueda_libre(query, limite=10):
     conn=_conn(); cur=conn.cursor()
@@ -135,6 +323,60 @@ def generar_informe_completo(carta_activa):
       <div style="font-size:12px;color:#c5cae9;margin-top:4px">{fecha} · Casas: {sistema} · Miguel García</div>
     </div>""")
 
+    # ── SECCIÓN ASC ──────────────────────────────────────────────────────────
+    ASC_lon = carta_activa.get('ASC')
+    if ASC_lon is not None:
+        asc_sig  = _signo(ASC_lon)
+        asc_deg  = int(ASC_lon % 30)
+        asc_min  = int((ASC_lon % 30 % 1) * 60)
+        rows_asc = get_planeta('ASC', asc_sig, 1)
+        if rows_asc:
+            sec.append(f"""<h3 style="color:#6d4c41;border-bottom:2px solid #6d4c41;
+                padding-bottom:6px;margin:0 0 12px">🌅 Ascendente en {asc_sig}</h3>""")
+            for cab, texto, _ in rows_asc:
+                sec.append(f"""<div style="background:#fbe9e7;border-left:4px solid #bf360c;
+                        padding:10px 14px;margin:3px 0;border-radius:0 6px 6px 0">
+                      <div style="font-size:10px;color:#bf360c;font-weight:700;margin-bottom:4px;
+                          text-transform:uppercase;letter-spacing:.04em">{cab}
+                        <span style="color:#9e9e9e;font-weight:400">
+                          ({asc_deg}°{asc_sig[:3]}{asc_min:02d}')</span></div>
+                      <div style="font-size:13px;color:#212121;line-height:1.65">{texto}</div>
+                    </div>""")
+
+    # ── SECCIÓN MAYORÍAS PLANETARIAS ─────────────────────────────────────────
+    mayor = mayorias_planetarias(planets_lon)
+    ELEM_BGS  = {'Fuego':'#fff3e0','Tierra':'#f1f8e9','Aire':'#e3f2fd','Agua':'#ede7f6'}
+    ELEM_BORD = {'Fuego':'#e65100','Tierra':'#33691e','Aire':'#0d47a1','Agua':'#4a148c'}
+    MODAL_BGS  = {'Cardinal':'#fff8e1','Fijo':'#fce4ec','Mutable':'#e8f5e9'}
+    MODAL_BORD = {'Cardinal':'#f9a825','Fijo':'#c62828','Mutable':'#2e7d32'}
+    sec.append("""<h3 style="color:#37474f;border-bottom:2px solid #37474f;
+        padding-bottom:6px;margin:20px 0 12px">⚖️ Mayorías Planetarias</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">""")
+    for elem, planetas in mayor['elementos'].items():
+        n = len(planetas)
+        bg = ELEM_BGS[elem]; bord = ELEM_BORD[elem]
+        ic = ELEM_ICONS[elem]
+        pl_str = ', '.join(planetas) if planetas else '—'
+        sec.append(f"""<div style="flex:1;min-width:130px;background:{bg};border:1px solid {bord};
+            border-radius:8px;padding:8px 12px">
+          <div style="font-size:12px;font-weight:700;color:{bord}">{ic} {elem} <span
+            style="background:{bord};color:#fff;border-radius:9px;padding:1px 7px;font-size:11px">{n}</span></div>
+          <div style="font-size:11px;color:#424242;margin-top:4px">{pl_str}</div>
+        </div>""")
+    sec.append('</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">')
+    for mod, planetas in mayor['modalidades'].items():
+        n = len(planetas)
+        bg = MODAL_BGS[mod]; bord = MODAL_BORD[mod]
+        ic = MODAL_ICONS[mod]
+        pl_str = ', '.join(planetas) if planetas else '—'
+        sec.append(f"""<div style="flex:1;min-width:130px;background:{bg};border:1px solid {bord};
+            border-radius:8px;padding:8px 12px">
+          <div style="font-size:12px;font-weight:700;color:{bord}">{ic} {mod} <span
+            style="background:{bord};color:#fff;border-radius:9px;padding:1px 7px;font-size:11px">{n}</span></div>
+          <div style="font-size:11px;color:#424242;margin-top:4px">{pl_str}</div>
+        </div>""")
+    sec.append('</div>')
+
     # SECCION PLANETAS EN SIGNO
     sec.append("""<h3 style="color:#1565c0;border-bottom:2px solid #1565c0;
         padding-bottom:6px;margin:0 0 12px">🪐 Planetas en Signo</h3>""")
@@ -157,7 +399,10 @@ def generar_informe_completo(carta_activa):
         </div>""")
 
         for cab, texto, tipo in rows:
-            if tipo == 'signo':
+            if tipo == 'sol':
+                label = f'☉ SOL.ASC — {cab}'
+                bg_col = '#fffde7'; borde = '#f9a825'; txt_col = '#e65100'
+            elif tipo == 'signo':
                 label = f'📍 Por signo — {cab}'
                 bg_col = '#e3f2fd'; borde = '#1976d2'; txt_col = '#1565c0'
             else:
@@ -203,10 +448,38 @@ def generar_informe_completo(carta_activa):
     if n_asp == 0:
         sec.append('<p style="color:#888;font-style:italic">Sin aspectos con texto en DB.</p>')
 
+    # ── SECCIÓN REGENTES DE CASAS ─────────────────────────────────────────────
+    sec.append("""<h3 style="color:#1b5e20;border-bottom:2px solid #1b5e20;
+        padding-bottom:6px;margin:24px 0 12px">🏛️ Regentes de Casas</h3>""")
+    n_reg = 0
+    for casa_n in range(1, 13):
+        cusp_lon = cusps[casa_n - 1]
+        cusp_sig = _signo(cusp_lon)
+        ruler_dash = SIGN_RULER_CLASSIC.get(cusp_sig)
+        if not ruler_dash or ruler_dash not in planets_lon: continue
+        ruler_lon  = planets_lon[ruler_dash]
+        casa_ruler = _casa(ruler_lon, cusps)
+        row = get_regente(casa_n, casa_ruler)
+        if not row: continue
+        cab, texto = row
+        ruler_sig = _signo(ruler_lon)
+        sec.append(f"""<div style="background:#f1f8e9;border-left:4px solid #2e7d32;
+            padding:10px 14px;margin:4px 0;border-radius:0 6px 6px 0">
+          <div style="font-size:11px;color:#1b5e20;font-weight:700;margin-bottom:4px">
+            Casa {casa_n} ({cusp_sig}) → regente {ruler_dash} en {ruler_sig} · Casa {casa_ruler}
+            <span style="color:#9e9e9e;font-weight:400"> — {cab}</span>
+          </div>
+          <div style="font-size:13px;color:#212121;line-height:1.65">{texto}</div>
+        </div>""")
+        n_reg += 1
+
+    if n_reg == 0:
+        sec.append('<p style="color:#888;font-style:italic">Sin textos de regentes en DB.</p>')
+
     # PIE
     sec.append(f"""<div style="margin-top:20px;padding:8px 14px;background:#f5f5f5;
         border-radius:6px;font-size:11px;color:#757575;border:1px solid #e0e0e0">
-      kepler.db · {n_bloques} interpretaciones de planetas · {n_asp} aspectos
+      kepler.db · {n_bloques} interpretaciones de planetas · {n_asp} aspectos · {n_reg} regentes
     </div>""")
 
     return '\n'.join(sec)

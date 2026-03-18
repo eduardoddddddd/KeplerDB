@@ -125,6 +125,8 @@ tr:hover td{background:#fafafa}
       <div class="tab" onclick="showTab('aspectos')">⚡ Aspectos</div>
       <div class="tab" onclick="showTab('rueda')">🔵 Rueda</div>
       <div class="tab" onclick="showTab('kepler')">📖 Kepler</div>
+      <div class="tab" onclick="showTab('transitos')">🌍 Tránsitos</div>
+      <div class="tab" onclick="showTab('sinastria')">💞 Sinastría</div>
     </div>
 
     <div id="panel-tabla" class="panel active">
@@ -150,12 +152,114 @@ tr:hover td{background:#fafafa}
     <div id="panel-kepler" class="panel">
       <div id="kepler-out"></div>
     </div>
+
+    <div id="panel-transitos" class="panel">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;
+          background:#f8f9fa;padding:12px;border-radius:8px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:11px;color:#616161;margin-bottom:3px">Fecha tránsito</label>
+          <div style="display:flex;gap:6px">
+            <input id="t_dia"  type="number" value="" min="1" max="31" style="width:60px" placeholder="Día"/>
+            <input id="t_mes"  type="number" value="" min="1" max="12" style="width:60px" placeholder="Mes"/>
+            <input id="t_anio" type="number" value="" min="-5000" max="5000" style="width:80px" placeholder="Año"/>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;color:#616161;margin-bottom:3px">Hora UTC local</label>
+          <div style="display:flex;gap:6px">
+            <input id="t_hora" type="number" value="12" min="0" max="23" style="width:60px" placeholder="Hora"/>
+            <input id="t_min"  type="number" value="0"  min="0" max="59" style="width:60px" placeholder="Min"/>
+          </div>
+        </div>
+        <div>
+          <button onclick="calcularTransitos()"
+            style="background:#1565c0;color:#fff;border:none;padding:8px 18px;
+                   border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+            🔭 Calcular Tránsitos
+          </button>
+        </div>
+        <div id="trans-meta" style="font-size:11px;color:#757575;padding:4px 0"></div>
+      </div>
+      <div id="trans-out">
+        <p style="color:#9e9e9e;font-style:italic;padding:20px 0">
+          Selecciona una fecha y pulsa Calcular Tránsitos.</p>
+      </div>
+    </div>
+
+    <div id="panel-sinastria" class="panel">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;
+          background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:14px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#4a148c;margin-bottom:8px">👤 Persona 1</div>
+          <label style="font-size:11px;color:#616161">Nombre</label>
+          <input id="s1_nombre" type="text" style="width:100%;margin-bottom:6px"/>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <input id="s1_dia" type="number" placeholder="Día" style="width:50px" min="1" max="31"/>
+            <input id="s1_mes" type="number" placeholder="Mes" style="width:50px" min="1" max="12"/>
+            <input id="s1_anio" type="number" placeholder="Año" style="width:72px"/>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <input id="s1_hora" type="number" placeholder="Hora" style="width:55px" min="0" max="23"/>
+            <input id="s1_min"  type="number" placeholder="Min"  style="width:50px" min="0" max="59"/>
+            <input id="s1_offset" type="number" placeholder="GMT" style="width:55px" step="0.5"/>
+          </div>
+          <div style="display:flex;gap:4px">
+            <input id="s1_lat" type="number" placeholder="Lat" style="width:80px" step="0.01"/>
+            <input id="s1_lon" type="number" placeholder="Lon" style="width:80px" step="0.01"/>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#1a237e;margin-bottom:8px">👤 Persona 2</div>
+          <label style="font-size:11px;color:#616161">Nombre</label>
+          <input id="s2_nombre" type="text" style="width:100%;margin-bottom:6px"/>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <input id="s2_dia" type="number" placeholder="Día" style="width:50px" min="1" max="31"/>
+            <input id="s2_mes" type="number" placeholder="Mes" style="width:50px" min="1" max="12"/>
+            <input id="s2_anio" type="number" placeholder="Año" style="width:72px"/>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <input id="s2_hora" type="number" placeholder="Hora" style="width:55px" min="0" max="23"/>
+            <input id="s2_min"  type="number" placeholder="Min"  style="width:50px" min="0" max="59"/>
+            <input id="s2_offset" type="number" placeholder="GMT" style="width:55px" step="0.5"/>
+          </div>
+          <div style="display:flex;gap:4px">
+            <input id="s2_lat" type="number" placeholder="Lat" style="width:80px" step="0.01"/>
+            <input id="s2_lon" type="number" placeholder="Lon" style="width:80px" step="0.01"/>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <label style="font-size:12px;color:#616161">Orbe</label>
+        <input id="s_orbe" type="number" value="6" min="1" max="10" style="width:55px"/>
+        <button onclick="cargarNatalEnSinastria()"
+          style="background:#e8eaf6;color:#283593;border:1px solid #9fa8da;
+                 padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">
+          📋 Cargar carta natal → P1
+        </button>
+        <button onclick="calcularSinastria()"
+          style="background:#4a148c;color:#fff;border:none;
+                 padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+          💞 Calcular Sinastría
+        </button>
+        <span id="sin-meta" style="font-size:11px;color:#757575"></span>
+      </div>
+      <div id="sin-out">
+        <p style="color:#9e9e9e;font-style:italic;padding:20px 0">
+          Introduce los datos de ambas personas y pulsa Calcular Sinastría.</p>
+      </div>
+    </div>
   </div>
 </div>
 </div>
 
 <script>
-window.addEventListener('load', listarCartas);
+window.addEventListener('load', ()=>{
+  listarCartas();
+  const hoy = new Date();
+  document.getElementById('t_dia').value  = hoy.getDate();
+  document.getElementById('t_mes').value  = hoy.getMonth()+1;
+  document.getElementById('t_anio').value = hoy.getFullYear();
+});
 
 async function listarCartas(){
   const r = await fetch('/cartas/listar');
@@ -212,7 +316,7 @@ async function borrarCarta(nombre){
 
 function showTab(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const names=['tabla','aspectos','rueda','kepler'];
+    const names=['tabla','aspectos','rueda','kepler','transitos','sinastria'];
     t.classList.toggle('active', names[i]===name);
   });
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -304,6 +408,122 @@ async function calcular(){
 document.addEventListener('keydown', e=>{
   if(e.key==='Enter') calcular();
 });
+
+function cargarNatalEnSinastria(){
+  const c = window._cartaActual;
+  if(!c){ alert('Primero calcula una carta natal.'); return; }
+  document.getElementById('s1_nombre').value = c.nombre||'';
+  document.getElementById('s1_dia').value    = c.dia||'';
+  document.getElementById('s1_mes').value    = c.mes||'';
+  document.getElementById('s1_anio').value   = c.anio||'';
+  document.getElementById('s1_hora').value   = c.hora||'';
+  document.getElementById('s1_min').value    = c.min||'';
+  document.getElementById('s1_offset').value = c.offset||'';
+  document.getElementById('s1_lat').value    = c.lat||'';
+  document.getElementById('s1_lon').value    = c.lon||'';
+}
+
+async function calcularSinastria(){
+  const g = id => document.getElementById(id).value;
+  const required = ['s1_dia','s1_mes','s1_anio','s2_dia','s2_mes','s2_anio'];
+  if(required.some(id=>!g(id))){ alert('Faltan datos de fecha en alguna persona.'); return; }
+  document.getElementById('sin-out').innerHTML =
+    '<p style="color:#9e9e9e;padding:20px 0">Calculando...</p>';
+  document.getElementById('sin-meta').textContent = '';
+  const payload = {
+    p1_nombre:g('s1_nombre')||'Persona 1',
+    p1_dia:g('s1_dia'), p1_mes:g('s1_mes'), p1_anio:g('s1_anio'),
+    p1_hora:g('s1_hora')||'12', p1_min:g('s1_min')||'0',
+    p1_offset:g('s1_offset')||'-1',
+    p1_lat:g('s1_lat')||'40.42', p1_lon:g('s1_lon')||'-3.70',
+    p1_sistema:'Regiomontanus',
+    p2_nombre:g('s2_nombre')||'Persona 2',
+    p2_dia:g('s2_dia'), p2_mes:g('s2_mes'), p2_anio:g('s2_anio'),
+    p2_hora:g('s2_hora')||'12', p2_min:g('s2_min')||'0',
+    p2_offset:g('s2_offset')||'-1',
+    p2_lat:g('s2_lat')||'40.42', p2_lon:g('s2_lon')||'-3.70',
+    p2_sistema:'Regiomontanus',
+    orbe: parseInt(g('s_orbe'))||6
+  };
+  try {
+    const r = await fetch('/sinastria',{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await r.json();
+    if(!data.ok){
+      document.getElementById('sin-out').innerHTML =
+        `<pre style="color:#c62828;font-size:11px">${data.error}</pre>`; return;
+    }
+    document.getElementById('sin-meta').textContent =
+      `${data.nombre1} ↔ ${data.nombre2}`;
+    document.getElementById('sin-out').innerHTML = data.html;
+  } catch(e){
+    document.getElementById('sin-out').innerHTML=`<p style="color:#c62828">Error: ${e}</p>`;
+  }
+}
+
+async function calcularTransitos(){
+  if(!window._cartaActual){
+    alert('Primero calcula una carta natal.'); return;
+  }
+  const c = window._cartaActual;
+  const t_dia  = document.getElementById('t_dia').value;
+  const t_mes  = document.getElementById('t_mes').value;
+  const t_anio = document.getElementById('t_anio').value;
+  const t_hora = document.getElementById('t_hora').value || '12';
+  const t_min  = document.getElementById('t_min').value  || '0';
+  if(!t_dia || !t_mes || !t_anio){
+    alert('Introduce la fecha de tránsito completa.'); return;
+  }
+  document.getElementById('trans-out').innerHTML =
+    '<p style="color:#9e9e9e;padding:20px 0">Calculando...</p>';
+  document.getElementById('trans-meta').textContent = '';
+  const payload = {
+    t_dia, t_mes, t_anio, t_hora, t_min,
+    anio:c.anio, mes:c.mes, dia:c.dia,
+    hora:c.hora, min:c.min, offset:c.offset,
+    lat:c.lat, lon:c.lon, sistema:c.sistema
+  };
+  try {
+    const r = await fetch('/transitos',{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await r.json();
+    if(!data.ok){
+      document.getElementById('trans-out').innerHTML =
+        `<pre style="color:#c62828;font-size:11px">${data.error}</pre>`; return;
+    }
+    document.getElementById('trans-meta').textContent =
+      `${data.fecha_trans} · ${data.n_total} aspectos · ${data.n_texto} con texto Kepler`;
+    if(!data.aspectos.length){
+      document.getElementById('trans-out').innerHTML =
+        '<p style="color:#9e9e9e;font-style:italic;padding:20px 0">Sin aspectos activos.</p>';
+      return;
+    }
+    const ASP_ICONS={'Conjunción':'☌','Sextil':'⚹','Cuadratura':'□','Trígono':'△','Oposición':'☍'};
+    const html = data.aspectos.map(a=>{
+      const icon = ASP_ICONS[a.asp]||'·';
+      const txtBloque = a.texto ? `<div style="font-size:12px;color:#424242;line-height:1.6;
+          margin-top:6px;border-top:1px solid rgba(0,0,0,.06);padding-top:6px">${a.texto}</div>`:
+        `<span style="font-size:10px;color:#bdbdbd;margin-left:6px">sin texto en DB</span>`;
+      return `<div style="background:${a.bg};border-left:4px solid ${a.col};
+          padding:9px 14px;margin:4px 0;border-radius:0 6px 6px 0;${!a.texto?'opacity:0.65':''}">
+        <div style="font-size:12px;font-weight:700;color:${a.col}">
+          <span style="font-size:15px">${icon}</span>
+          <span style="margin:0 4px">${a.trans}${a.retro}</span>
+          <span style="font-weight:400"> ${a.asp} </span>
+          <span style="color:#1a237e;margin:0 4px">${a.natal}</span>
+          <span style="font-size:11px;font-weight:400;color:#9e9e9e">(orbe ${a.orb}°)</span>
+        </div>${txtBloque}</div>`;
+    }).join('');
+    document.getElementById('trans-out').innerHTML =
+      `<div style="background:#e3f2fd;border:1px solid #1565c0;border-radius:6px;
+          padding:8px 14px;margin-bottom:12px;font-size:12px;color:#0d47a1">
+        Tránsitos <b>${data.fecha_trans}</b> sobre carta natal de <b>${c.nombre}</b>
+        &nbsp;·&nbsp; Orbes: Luminarias ≤1-2°, Superiores ≤3°
+      </div>${html}`;
+  } catch(e){
+    document.getElementById('trans-out').innerHTML=`<p style="color:#c62828">Error: ${e}</p>`;
+  }
+}
 </script>
 </body>
 </html>
