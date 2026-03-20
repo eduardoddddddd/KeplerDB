@@ -348,6 +348,30 @@ def sinastria():
         return jsonify({'ok': False, 'error': traceback.format_exc()})
 
 
+@app.route('/famosos/buscar')
+def famosos_buscar():
+    try:
+        q = request.args.get('q','').strip()
+        if len(q) < 2:
+            return jsonify({'ok': True, 'famosos': []})
+        import sqlite3 as _sq
+        conn = _sq.connect(ki.DB_PATH)
+        cur  = conn.cursor()
+        cur.execute("""SELECT id,nombre,lugar,anio,mes,dia,hora,min,gmt,lat,lon,descripcion
+            FROM cartas WHERE nombre LIKE ? OR descripcion LIKE ? LIMIT 20""",
+            (f'%{q}%', f'%{q}%'))
+        rows = cur.fetchall()
+        conn.close()
+        famosos = [{'id':r[0],'nombre':r[1],'lugar':r[2] or '',
+                    'anio':r[3],'mes':r[4],'dia':r[5],
+                    'hora':r[6],'min':r[7],'gmt':r[8],
+                    'lat':r[9],'lon':r[10],
+                    'desc': (r[11] or '').split(':')[-1].strip()[:40]} for r in rows]
+        return jsonify({'ok': True, 'famosos': famosos})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
 @app.route('/cartas/guardar', methods=['POST'])
 def guardar_carta():
     try:
