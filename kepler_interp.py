@@ -68,8 +68,7 @@ def _casa(lon, cusps):
 
 def get_planeta(planeta_dash, signo_str, casa_num):
     """
-    Textos de planeta en signo y casa (PLANETAS.ASC).
-    Para Sol además añade el texto de SOL.ASC (más detallado).
+    Textos de planeta en signo (PLANETAS.ASC + SOL.ASC) y en casa (CASAS.ASC).
     """
     p = PLANET_MAP.get(planeta_dash, planeta_dash)
     s = SIGN_MAP.get(signo_str, signo_str)
@@ -83,7 +82,7 @@ def get_planeta(planeta_dash, signo_str, casa_num):
         r = cur.fetchone()
         if r: results.append(r)
 
-    # Texto por SIGNO en PLANETAS.ASC (primario)
+    # Texto por SIGNO (PLANETAS.ASC o ASCEN.ASC)
     if p == 'Ascendente':
         cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
             WHERE planeta1='Ascendente' AND signo=? AND fichero='ASCEN.ASC' LIMIT 1""", (s,))
@@ -91,18 +90,12 @@ def get_planeta(planeta_dash, signo_str, casa_num):
         cur.execute("""SELECT cabecera,texto,'signo' FROM interpretaciones
             WHERE planeta1=? AND signo=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, s))
     r = cur.fetchone()
-    if r:
-        results.append(r)
-        import re as _re
-        m = _re.search(r'CASA\s+(\d+)', r[0])
-        casa_en_texto = int(m.group(1)) if m else -1
-    else:
-        casa_en_texto = -1
+    if r: results.append(r)
 
-    # Texto por CASA si distinta al signo
-    if casa_num != casa_en_texto and p != 'Ascendente':
+    # Texto por CASA (CASAS.ASC) — solo si el planeta no es ASC
+    if p != 'Ascendente':
         cur.execute("""SELECT cabecera,texto,'casa' FROM interpretaciones
-            WHERE planeta1=? AND casa=? AND fichero='PLANETAS.ASC' LIMIT 1""", (p, casa_num))
+            WHERE signo=? AND casa=? AND fichero='CASAS.ASC' LIMIT 1""", (s, casa_num))
         r = cur.fetchone()
         if r: results.append(r)
 
@@ -283,6 +276,133 @@ def generar_informe_sinastria(carta1, carta2, orbe=6):
     return '\n'.join(sec)
 
 
+def get_planeta_rev(planeta_dash, casa_natal):
+    """Texto de planeta de RS en casa natal (PLANETAS.REV)."""
+    p = PLANET_MAP.get(planeta_dash, planeta_dash)
+    conn = _conn(); cur = conn.cursor()
+    cur.execute("""SELECT cabecera,texto FROM interpretaciones
+        WHERE fichero='PLANETAS.REV' AND planeta1=? AND casa=? LIMIT 1""",
+        (p, casa_natal))
+    row = cur.fetchone(); conn.close(); return row
+
+def get_casa_rev(punto_dash, casa_natal):
+    """Texto de punto de RS en casa natal (CASAS.REV)."""
+    p = PLANET_MAP.get(punto_dash, punto_dash)
+    conn = _conn(); cur = conn.cursor()
+    cur.execute("""SELECT cabecera,texto FROM interpretaciones
+        WHERE fichero='CASAS.REV' AND planeta1=? AND casa=? LIMIT 1""",
+        (p, casa_natal))
+    row = cur.fetchone(); conn.close(); return row
+
+def get_regente_rev(casa_natal, casa_rs):
+    """Texto de regente de casa natal en casa de RS (REGENTES.REV)."""
+    conn = _conn(); cur = conn.cursor()
+    cur.execute("""SELECT cabecera,texto FROM interpretaciones
+        WHERE fichero='REGENTES.REV' AND casa=? AND cabecera LIKE ? LIMIT 1""",
+        (casa_natal, f'Regente casa natal {casa_natal} en casa RS {casa_rs}'))
+    row = cur.fetchone(); conn.close(); return row
+
+
+def generar_informe_rs(carta_natal, carta_rs):
+    """
+    Informe HTML de Revolución Solar.
+    carta_natal: carta base (ASC, MC, cusps, planets)
+    carta_rs: carta calculada para el año (ASC, MC, cusps, planets)
+    """
+    nombre  = carta_natal.get('nombre', 'Carta')
+    anio_rs = carta_rs.get('anio_rs', '')
+    cusps_n = carta_natal.get('cusps', [i*30 for i in range(12)])
+    cusps_r = carta_rs.get('cusps', [i*30 for i in range(12)])
+    planets_rs = carta_rs.get('planets', {})
+
+    ORDEN = ['Sol','Luna','Mercurio','Venus','Marte','Jupiter',
+             'Saturno','Urano','Neptuno','Pluton']
+    sec = []
+    sec.append(f"""<div style="background:#1b5e20;color:#fff;padding:14px 18px;
+        border-radius:8px;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:700">☀️ Revolución Solar {anio_rs} — {nombre}</div>
+      <div style="font-size:12px;color:#c8e6c9;margin-top:4px">
+        Planetas RS en casas natales · Textos Kepler 4</div>
+    </div>""")
+
+    # Planetas de RS en casa natal
+    sec.append("""<h3 style="color:#1b5e20;border-bottom:2px solid #1b5e20;
+        padding-bottom:6px;margin:0 0 12px">🪐 Planetas RS en Casa Natal</h3>""")
+
+    n_tex = 0
+    for pname in ORDEN:
+        if pname not in planets_rs: continue
+        lon_rs = planets_rs[pname]
+        casa_n = _casa(lon_rs, cusps_n)
+        sig_rs = _signo(lon_rs)
+        deg    = int(lon_rs % 30); minn = int((lon_rs % 30 % 1)*60)
+        row = get_planeta_rev(pname, casa_n)
+        if not row: continue
+        sec.append(f"""<div style="margin:14px 0 4px">
+          <b style="color:#1a237e">{pname}</b>
+          <span style="color:#424242;font-size:13px"> RS en {sig_rs} · Casa natal {casa_n}</span>
+          <span style="color:#9e9e9e;font-size:11px"> ({deg}°{sig_rs[:3]}{minn:02d}')</span>
+        </div>
+        <div style="background:#e8f5e9;border-left:4px solid #388e3c;padding:10px 14px;
+            margin:2px 0 2px 16px;border-radius:0 6px 6px 0">
+          <div style="font-size:10px;color:#1b5e20;font-weight:700;margin-bottom:4px;
+              text-transform:uppercase">{row[0]}</div>
+          <div style="font-size:13px;color:#212121;line-height:1.65">{row[1]}</div>
+        </div>""")
+        n_tex += 1
+
+    # ASC de RS en casa natal
+    sec.append("""<h3 style="color:#4a148c;border-bottom:2px solid #4a148c;
+        padding-bottom:6px;margin:20px 0 12px">🌅 Puntos RS en Casa Natal</h3>""")
+
+    for punto_dash, punto_key in [('ASC','ASC'),('MC','MC')]:
+        lon_p = carta_rs.get(punto_key)
+        if lon_p is None: continue
+        casa_n = _casa(lon_p, cusps_n)
+        sig_p  = _signo(lon_p)
+        row = get_casa_rev(punto_dash, casa_n)
+        label = 'Ascendente RS' if punto_dash == 'ASC' else 'Medio Cielo RS'
+        if not row: continue
+        sec.append(f"""<div style="margin:10px 0 4px">
+          <b style="color:#4a148c">{label}</b>
+          <span style="color:#424242;font-size:13px"> en {sig_p} · Casa natal {casa_n}</span>
+        </div>
+        <div style="background:#f3e5f5;border-left:4px solid #7b1fa2;padding:10px 14px;
+            margin:2px 0 2px 16px;border-radius:0 6px 6px 0">
+          <div style="font-size:10px;color:#4a148c;font-weight:700;margin-bottom:4px;
+              text-transform:uppercase">{row[0]}</div>
+          <div style="font-size:13px;color:#212121;line-height:1.65">{row[1]}</div>
+        </div>""")
+        n_tex += 1
+
+    # Regentes de casas natales en casas de RS
+    sec.append("""<h3 style="color:#e65100;border-bottom:2px solid #e65100;
+        padding-bottom:6px;margin:20px 0 12px">🏛️ Regentes Natales en Casas RS</h3>""")
+
+    for casa_n in range(1, 13):
+        cusp_sig = _signo(cusps_n[casa_n-1])
+        ruler_dash = SIGN_RULER_CLASSIC.get(cusp_sig)
+        if not ruler_dash or ruler_dash not in planets_rs: continue
+        lon_ruler_rs = planets_rs[ruler_dash]
+        casa_rs_num  = _casa(lon_ruler_rs, cusps_r)
+        row = get_regente_rev(casa_n, casa_rs_num)
+        if not row: continue
+        sec.append(f"""<div style="background:#fff3e0;border-left:4px solid #e65100;
+            padding:9px 14px;margin:4px 0;border-radius:0 6px 6px 0">
+          <div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:4px">
+            Casa natal {casa_n} ({cusp_sig}) → regente {ruler_dash} en casa RS {casa_rs_num}
+          </div>
+          <div style="font-size:13px;color:#212121;line-height:1.65">{row[1]}</div>
+        </div>""")
+        n_tex += 1
+
+    sec.append(f"""<div style="margin-top:16px;padding:8px 14px;background:#f1f8e9;
+        border-radius:6px;font-size:11px;color:#33691e;border:1px solid #aed581">
+      PLANETAS.REV + CASAS.REV + REGENTES.REV · {n_tex} interpretaciones
+    </div>""")
+    return '\n'.join(sec)
+
+
 def busqueda_libre(query, limite=10):
     conn=_conn(); cur=conn.cursor()
     cur.execute("""SELECT i.fichero,i.cabecera,i.texto
@@ -403,11 +523,11 @@ def generar_informe_completo(carta_activa):
                 label = f'☉ SOL.ASC — {cab}'
                 bg_col = '#fffde7'; borde = '#f9a825'; txt_col = '#e65100'
             elif tipo == 'signo':
-                label = f'📍 Por signo — {cab}'
+                label = f'📍 En signo — {cab}'
                 bg_col = '#e3f2fd'; borde = '#1976d2'; txt_col = '#1565c0'
-            else:
-                label = f'🏠 Por casa {casa} — {cab}'
-                bg_col = '#fff8e1'; borde = '#f9a825'; txt_col = '#e65100'
+            else:  # casa — CASAS.ASC
+                label = f'🏠 En casa {casa} — {cab}'
+                bg_col = '#e8f5e9'; borde = '#388e3c'; txt_col = '#1b5e20'
             sec.append(f"""<div style="background:{bg_col};border-left:4px solid {borde};
                     padding:10px 14px;margin:3px 0 3px 16px;border-radius:0 6px 6px 0">
                   <div style="font-size:10px;color:{txt_col};font-weight:700;margin-bottom:4px;

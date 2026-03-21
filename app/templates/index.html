@@ -137,6 +137,7 @@ tr:hover td{background:#fafafa}
       <div class="tab" onclick="showTab('kepler')">📖 Kepler</div>
       <div class="tab" onclick="showTab('transitos')">🌍 Tránsitos</div>
       <div class="tab" onclick="showTab('sinastria')">💞 Sinastría</div>
+      <div class="tab" onclick="showTab('rs')">☀️ Rev. Solar</div>
     </div>
 
     <div id="panel-tabla" class="panel active">
@@ -303,6 +304,35 @@ tr:hover td{background:#fafafa}
           Introduce los datos de ambas personas y pulsa Calcular Sinastría.</p>
       </div>
     </div>
+
+    <div id="panel-rs" class="panel">
+      <div style="background:#f1f8e9;padding:12px;border-radius:8px;margin-bottom:14px;
+          display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div>
+          <label style="display:block;font-size:11px;color:#616161;margin-bottom:3px">
+            Año de la Revolución Solar</label>
+          <input id="rs_anio" type="number" style="width:100px"
+            placeholder="2026"/>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="calcularRS()"
+            style="background:#1b5e20;color:#fff;border:none;padding:8px 18px;
+                   border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+            ☀️ Calcular RS
+          </button>
+          <button onclick="imprimirInforme('rs-kepler','Revolución Solar')"
+            style="background:#f1f8e9;color:#1b5e20;border:1px solid #a5d6a7;
+                   padding:8px 12px;border-radius:6px;cursor:pointer;font-size:12px">
+            📄 PDF
+          </button>
+        </div>
+        <span id="rs-meta" style="font-size:11px;color:#757575"></span>
+      </div>
+      <div id="rs-out">
+        <p style="color:#9e9e9e;font-style:italic;padding:20px 0">
+          Introduce el año y pulsa Calcular RS. Usa la carta natal ya calculada como base.</p>
+      </div>
+    </div>
   </div>
 </div>
 </div>
@@ -314,6 +344,7 @@ window.addEventListener('load', ()=>{
   document.getElementById('t_dia').value  = hoy.getDate();
   document.getElementById('t_mes').value  = hoy.getMonth()+1;
   document.getElementById('t_anio').value = hoy.getFullYear();
+  document.getElementById('rs_anio').value = hoy.getFullYear();
 });
 
 let _famososTimer = null;
@@ -485,7 +516,7 @@ async function borrarCarta(nombre){
 
 function showTab(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const names=['tabla','aspectos','rueda','kepler','transitos','sinastria'];
+    const names=['tabla','aspectos','rueda','kepler','transitos','sinastria','rs'];
     t.classList.toggle('active', names[i]===name);
   });
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -577,6 +608,41 @@ async function calcular(){
 document.addEventListener('keydown', e=>{
   if(e.key==='Enter') calcular();
 });
+
+async function calcularRS(){
+  const c = window._cartaActual;
+  if(!c){ alert('Primero calcula una carta natal.'); return; }
+  const anio_rs = document.getElementById('rs_anio').value;
+  if(!anio_rs){ alert('Introduce el año de la Revolución Solar.'); return; }
+  document.getElementById('rs-out').innerHTML =
+    '<p style="color:#9e9e9e;padding:20px 0">⏳ Calculando RS...</p>';
+  document.getElementById('rs-meta').textContent = '';
+  const payload = {
+    anio_rs: parseInt(anio_rs),
+    anio:c.anio, mes:c.mes, dia:c.dia,
+    hora:c.hora, min:c.min, offset:c.offset,
+    lat:c.lat, lon:c.lon, sistema:c.sistema, nombre:c.nombre
+  };
+  try {
+    const r = await fetch('/revolucion_solar',{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await r.json();
+    if(!data.ok){
+      document.getElementById('rs-out').innerHTML =
+        `<pre style="color:#c62828;font-size:11px">${data.error}</pre>`; return;
+    }
+    document.getElementById('rs-meta').textContent =
+      `RS ${data.anio_rs} · ${data.fecha_rs}`;
+    document.getElementById('rs-out').innerHTML = `
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;margin-bottom:16px">
+        <img src="data:image/png;base64,${data.rueda}"
+          style="width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.15)"/>
+        <div id="rs-kepler" style="overflow-y:auto">${data.html}</div>
+      </div>`;
+  } catch(e){
+    document.getElementById('rs-out').innerHTML=`<p style="color:#c62828">Error: ${e}</p>`;
+  }
+}
 
 function cargarNatalEnSinastria(){
   const c = window._cartaActual;

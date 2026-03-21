@@ -348,6 +348,76 @@ def sinastria():
         return jsonify({'ok': False, 'error': traceback.format_exc()})
 
 
+@app.route('/revolucion_solar', methods=['POST'])
+def revolucion_solar():
+    try:
+        d = request.json
+        # Carta natal
+        YN,MN,DN = int(d['anio']),int(d['mes']),int(d['dia'])
+        hN,mN,offN = int(d['hora']),int(d['min']),float(d['offset'])
+        latN,lonN = float(d['lat']),float(d['lon'])
+        sistema = d.get('sistema','Regiomontanus')
+        nombre  = d.get('nombre','')
+        anio_rs = int(d['anio_rs'])
+
+        # Calcular carta natal para JD base
+        H_utc_n = hN + offN + mN/60.0
+        JD_natal = swe.julday(YN,MN,DN,H_utc_n)
+
+        # Posición del Sol natal
+        sol_natal = swe.calc_ut(JD_natal, swe.SUN)[0][0]
+
+        # Buscar RS: día en que el Sol vuelve a la misma posición en anio_rs
+        # Estimación inicial: misma fecha del año objetivo
+        JD_est = swe.julday(anio_rs, MN, DN, 12.0)
+        # Refinar por bisección (Newton simplificado)
+        for _ in range(50):
+            sol_rs = swe.calc_ut(JD_est, swe.SUN)[0][0]
+            diff = sol_natal - sol_rs
+            if abs(diff) < 0.00001: break
+            if diff > 180: diff -= 360
+            if diff < -180: diff += 360
+            JD_est += diff / 360.0
+
+        # Carta RS con lat/lon natal
+        sis_b = SISTEMAS.get(sistema, b'R')
+        cusps_r, ascmc_r = swe.houses(JD_est, latN, lonN, sis_b)
+        ASC_r, MC_r = ascmc_r[0], ascmc_r[1]
+        planets_rs = {}
+        for name, pid in PLANET_IDS.items():
+            planets_rs[name] = swe.calc_ut(JD_est, pid)[0][0]
+
+        # Convertir JD a fecha legible
+        yr,mo,dy,hr = swe.revjul(JD_est)
+        h_int = int(hr); m_int = int((hr%1)*60)
+        fecha_rs_str = f'{int(dy):02d}/{int(mo):02d}/{int(yr)} {h_int:02d}:{m_int:02d}h UTC'
+
+        # Carta natal completa para casas
+        carta_natal = calcular_carta(YN,MN,DN,hN,mN,offN,latN,lonN,sistema)
+        carta_natal['nombre'] = nombre
+
+        carta_rs = {
+            'nombre': nombre, 'anio_rs': anio_rs,
+            'ASC': ASC_r, 'MC': MC_r,
+            'cusps': list(cusps_r),
+            'planets': planets_rs,
+        }
+
+        # Rueda RS
+        rueda_rs = rueda_png(
+            {'ASC':ASC_r,'MC':MC_r,'cusps':list(cusps_r),'planets':planets_rs},
+            nombre=f'RS {anio_rs}', fecha=fecha_rs_str)
+
+        import importlib; importlib.reload(ki)
+        html_rs = ki.generar_informe_rs(carta_natal, carta_rs)
+
+        return jsonify({'ok':True, 'html':html_rs, 'rueda':rueda_rs,
+                        'fecha_rs': fecha_rs_str, 'anio_rs': anio_rs})
+    except Exception as e:
+        import traceback
+        return jsonify({'ok':False,'error':traceback.format_exc()})
+
+
 @app.route('/famosos/buscar')
 def famosos_buscar():
     try:

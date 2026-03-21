@@ -171,6 +171,136 @@ def parse_regentes_asc():
         })
     return rows
 
+def parse_casas_asc():
+    """
+    CASAS.ASC: 144 bloques, 12 signos × 12 casas.
+    Cada signo en cada casa — texto específico (distinto a PLANETAS.ASC).
+    Orden en fichero: Aries en casa 12, 11, 10... 1, luego Tauro en casa 12, 11...
+    """
+    txt = leer('CASAS.ASC')
+    if not txt: return []
+    bloques = split_bloques(txt)
+    # Filtrar header
+    bloques = [(c,t) for c,t in bloques if not c.startswith('Fecha')]
+    print(f'  CASAS.ASC: {len(bloques)} bloques')
+    rows = []
+    for i, (cab, texto) in enumerate(bloques):
+        signo_idx = i // 12
+        casa = 12 - (i % 12)   # orden descendente: 12,11,10...1
+        if signo_idx >= 12: continue
+        signo = SIGN_ESP[signo_idx]
+        rows.append({
+            'fichero':'CASAS.ASC', 'indice':i+1,
+            'cabecera':cab, 'texto':texto,
+            'planeta1':None, 'planeta2':None,
+            'signo':signo, 'casa':casa, 'aspecto':None,
+        })
+    return rows
+
+
+def split_bloques_inline(txt):
+    """Parser para REV: separador # inline. Clave = primera palabra."""
+    partes = re.split(r'(?m)^#', txt)
+    bloques = []
+    for parte in partes:
+        parte = parte.strip()
+        if not parte or parte.startswith('*') or parte.startswith('Ultima'): continue
+        m = re.match(r'^(\S+)\s+(.*)', parte, re.DOTALL)
+        if not m: continue
+        cab = m.group(1).strip()
+        texto = re.sub(r'\s+', ' ', m.group(2)).strip()
+        if texto:
+            bloques.append((cab, texto))
+    return bloques
+
+
+def parse_planetas_rev():
+    """
+    PLANETAS.REV: 120 bloques — planeta de RS en casa natal.
+    Clave: Sol1..Sol12, Luna1..Luna12, ... (planeta + casa natal)
+    """
+    txt = leer('PLANETAS.REV')
+    if not txt: return []
+    bloques = split_bloques_inline(txt)
+    print(f'  PLANETAS.REV: {len(bloques)} bloques')
+    PREF = {'Sol':'Sol','Lun':'Luna','Mer':'Mercurio','Ven':'Venus','Mar':'Marte',
+            'Jup':'Júpiter','Sat':'Saturno','Ura':'Urano','Nep':'Neptuno','Plu':'Plutón',
+            'Júp':'Júpiter','Júi':'Júpiter'}
+    rows = []
+    for i, (clave, texto) in enumerate(bloques):
+        m = re.match(r'^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]+)(\d+)$', clave)
+        if not m: continue
+        pref = m.group(1)[:3].capitalize()
+        # normalizar Júp → Jup
+        pref = pref.replace('Ú','u').replace('ú','u')
+        casa = int(m.group(2))
+        planeta = PREF.get(pref)
+        if not planeta: continue
+        rows.append({
+            'fichero':'PLANETAS.REV', 'indice':i+1,
+            'cabecera':f'{planeta} RS en casa natal {casa}',
+            'texto':texto,
+            'planeta1':planeta, 'planeta2':None,
+            'signo':None, 'casa':casa, 'aspecto':None,
+        })
+    return rows
+
+
+def parse_casas_rev():
+    """
+    CASAS.REV: 144 bloques — ASC de RS en casa natal.
+    Clave: AscendenteCASA1, LunaCASA1, etc. (punto de RS en casa natal)
+    12 puntos × 12 casas.
+    """
+    txt = leer('CASAS.REV')
+    if not txt: return []
+    bloques = split_bloques_inline(txt)
+    print(f'  CASAS.REV: {len(bloques)} bloques')
+    rows = []
+    PREF_MAP = {'Ascendente':'Ascendente','Sol':'Sol','Luna':'Luna','Mercurio':'Mercurio',
+                'Venus':'Venus','Marte':'Marte','Jupiter':'Júpiter','Júpiter':'Júpiter',
+                'Saturno':'Saturno','Urano':'Urano','Neptuno':'Neptuno',
+                'Pluton':'Plutón','Plutón':'Plutón','Fondo':'Fondo del Cielo'}
+    for i, (clave, texto) in enumerate(bloques):
+        m = re.match(r'^(.+?)CASA(\d+)$', clave)
+        if not m: continue
+        punto = PREF_MAP.get(m.group(1), m.group(1))
+        casa = int(m.group(2))
+        rows.append({
+            'fichero':'CASAS.REV', 'indice':i+1,
+            'cabecera':f'{punto} RS en casa natal {casa}',
+            'texto':texto,
+            'planeta1':punto, 'planeta2':None,
+            'signo':None, 'casa':casa, 'aspecto':None,
+        })
+    return rows
+
+
+def parse_regentes_rev():
+    """
+    REGENTES.REV: 144 bloques — regente de casa natal en casa de RS.
+    Clave: RE1CASA1, RE1CASA2, ... RE12CASA12.
+    """
+    txt = leer('REGENTES.REV')
+    if not txt: return []
+    bloques = split_bloques_inline(txt)
+    print(f'  REGENTES.REV: {len(bloques)} bloques')
+    rows = []
+    for i, (clave, texto) in enumerate(bloques):
+        m = re.match(r'^RE(\d+)CASA(\d+)$', clave)
+        if not m: continue
+        casa_orig = int(m.group(1))
+        casa_rs   = int(m.group(2))
+        rows.append({
+            'fichero':'REGENTES.REV', 'indice':i+1,
+            'cabecera':f'Regente casa natal {casa_orig} en casa RS {casa_rs}',
+            'texto':texto,
+            'planeta1':None, 'planeta2':None,
+            'signo':None, 'casa':casa_orig, 'aspecto':None,
+        })
+    return rows
+
+
 def parse_pareja_asc():
     """PAREJA.ASC: formato ==COD."""
     txt = leer('PAREJA.ASC')
@@ -307,6 +437,10 @@ def main():
     all_rows += parse_aspectos_asc()
     all_rows += parse_regentes_asc()
     all_rows += parse_pareja_asc()
+    all_rows += parse_casas_asc()
+    all_rows += parse_planetas_rev()
+    all_rows += parse_casas_rev()
+    all_rows += parse_regentes_rev()
     insertar(conn, all_rows)
 
     # FTS
