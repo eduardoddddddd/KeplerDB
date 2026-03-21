@@ -209,6 +209,29 @@ ngrok http 5000
 
 La URL funciona mientras el PC esté encendido y ngrok activo.
 
+## Famosos en Sinastría
+
+En el tab Sinastría, P1 y P2 tienen cada uno un buscador de famosos
+(campo rosa `⭐ Buscar famoso...`) además del selector de cartas guardadas.
+Escribe 2+ letras → desplegable con resultados de las 8502 cartas históricas
+→ click rellena todos los campos automáticamente. Combinaciones libres:
+P1 carta guardada + P2 famoso, ambos famosos, uno manual, etc.
+
+## Exportar PDF
+
+Botón `📄 PDF` en tres tabs:
+
+| Tab | Ubicación |
+|---|---|
+| 📖 Kepler | Esquina superior derecha del panel |
+| 🌍 Tránsitos | Junto al botón Calcular |
+| 💞 Sinastría | Junto al botón Calcular |
+
+Abre ventana nueva con informe limpio (sin sidebar ni controles), encabezado
+con nombre y fecha, y lanza el diálogo de impresión automáticamente.
+Seleccionar "Guardar como PDF" en destino. Sin dependencias externas —
+usa el motor PDF del navegador (Chrome / Edge).
+
 ## Roadmap
 
 - [ ] Retorno Solar
